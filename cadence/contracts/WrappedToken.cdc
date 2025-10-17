@@ -26,14 +26,12 @@ access(all) contract WrappedToken: FungibleToken {
 
         access(all) fun withdraw(amount: UFix64): @FungibleToken.Vault {
             self.balance = self.balance - amount
-            emit TokensWithdrawn(amount: amount, from: self.owner?.address)
             return <-create Vault(balance: amount)
         }
 
         access(all) fun deposit(from: @FungibleToken.Vault) {
             let vault <- from as! @WrappedToken.Vault
             self.balance = self.balance + vault.balance
-            emit TokensDeposited(amount: vault.balance, to: self.owner?.address)
             destroy vault
         }
     }
@@ -49,7 +47,6 @@ access(all) contract WrappedToken: FungibleToken {
             let recipientRef = recipient.borrow() ?? panic("Could not borrow receiver reference")
             let newVault <- create Vault(balance: amount)
             WrappedToken.totalSupply = WrappedToken.totalSupply + amount
-            emit TokensMinted(amount: amount)
             recipientRef.deposit(from: <-newVault)
         }
     }
