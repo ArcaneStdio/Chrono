@@ -1,10 +1,16 @@
-/// An interface for a price oracle.
-///
+import BandOracle from 0x9fb6606c300b5051
+import FungibleToken from 0x9a0766d93b6608b7
+
 access(all) contract Oracle {
 
-    /// The interface for the price oracle
-    access(all) resource interface PriceOracle {
-        /// Get the price of a token
-        access(all) view fun getPrice(_ token: Type): UFix64
+    access(all) event PriceUpdated(symbol: String, price: String)
+    access(all) fun getPrice(symbol: String , payment: @{FungibleToken.Vault}): String {
+        let price: String = BandOracle.getReferenceData(
+            baseSymbol: symbol,
+            quoteSymbol: "USD",
+            payment: <- payment
+        ).fixedPointRate.toString()
+        emit PriceUpdated(symbol: symbol, price: price)
+        return price
     }
 }

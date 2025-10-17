@@ -1,9 +1,9 @@
 {
 	"contracts": {
-		"Counter": {
-			"source": "cadence/contracts/Counter.cdc",
+		"Oracle": {
+			"source": "cadence/contracts/Oracle.cdc",
 			"aliases": {
-				"testing": "0000000000000007"
+				"testing": "0000000000000008"
 			}
 		}
 	},
@@ -20,6 +20,20 @@
 				"type": "file",
 				"location": "emulator-account.pkey"
 			}
+		},
+		"testnet": {
+			"address": "e11cab85e85ae137",
+			"key": {
+				"type": "file",
+				"location": "testnet.pkey"
+			}
+		}
+	},
+	"deployments": {
+		"testnet": {
+			"testnet": [
+				"Oracle"
+			]
 		}
 	}
 }
