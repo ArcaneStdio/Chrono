@@ -20,7 +20,7 @@ access(all) contract CollateralVault {
         access(all) fun withdraw(amount: UFix64): @FungibleToken.Vault {
             self.balance = self.balance - amount
             return <-self.vault.withdraw(amount: amount)
-        }
+        } 
     }
 
     /// Create a new collateral vault

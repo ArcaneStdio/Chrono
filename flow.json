@@ -5,6 +5,24 @@
 			"aliases": {
 				"testing": "0000000000000008"
 			}
+		},
+		"TimeLendingProtocol": {
+			"source": "cadence/contracts/TimeLendingProtocol.cdc",
+			"aliases": {
+				"testing": "01cf0e2f2f715450"
+			}
+		},
+		"WrappedUSDC": {
+			"source": "cadence/contracts/WrappedUSDC.cdc",
+			"aliases": {
+				"testing": "179b6b1cb6755e31"
+			}
+		},
+		"IWrappedToken": {
+			"source": "cadence/contracts/IWrappedToken.cdc",
+			"aliases": {
+				"testing": "179b6b1cb6755e31"
+			}
 		}
 	},
 	"networks": {
@@ -30,6 +48,12 @@
 		}
 	},
 	"deployments": {
+		"emulator":{
+			"emulator-account": [
+				"IWrappedToken",
+				"TimeLendingProtocol"
+			]
+		},
 		"testnet": {
 			"testnet": [
 				"Oracle"
