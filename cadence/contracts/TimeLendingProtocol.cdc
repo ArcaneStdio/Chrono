@@ -18,6 +18,7 @@ access(all) contract TimeLendingProtocol {
     
     // Protocol parameters
     access(all) var maxLTV: UFix64  // Maximum Loan-to-Value ratio (e.g., 0.75 for 75%)
+     access(all) var maxLT: UFix64  
     access(all) var liquidationThreshold: UFix64  // Liquidation threshold (e.g., 0.85 for 85%)
     access(all) var baseInterestRate: UFix64  // Base interest rate
     
@@ -27,6 +28,10 @@ access(all) contract TimeLendingProtocol {
     access(all) var ltvFormulaB: UFix64  // Exponential coefficient
     access(all) var ltvFormulaC: Int64   // Time multiplier (can be negative for decay)
     
+    access(all) var ltFormulaA: UFix64  // Base LTV component 
+    access(all) var ltFormulaB: UFix64  // Exponential coefficient
+    access(all) var ltFormulaC: Int64   // Time multiplier (can be negative for decay)
+
     // Position counters
     access(all) var nextLendingPositionId: UInt64
     access(all) var nextBorrowingPositionId: UInt64
@@ -62,8 +67,9 @@ access(all) contract TimeLendingProtocol {
         access(all) let collateralAmount: UFix64
         access(all) let borrowTokenType: Type
         access(all) let borrowAmount: UFix64
-        access(all) let durationMinutes: UInt64  // Duration in minutes
-        access(all) let calculatedLTV: UFix64  // LTV used for this position
+        access(all) let durationMinutes: UInt64  //Duration in minutes
+        access(all) let calculatedLTV: UFix64  //LTV used for this position
+        access(all) let calculatedLT: UFix64   //LT used for position
         access(all) let repaymentDeadline: UFix64
         access(all) let timestamp: UFix64
         access(all) var isActive: Bool
@@ -78,6 +84,7 @@ access(all) contract TimeLendingProtocol {
             borrowAmount: UFix64, 
             durationMinutes: UInt64,
             calculatedLTV: UFix64
+            calculatedLT: UFix64
         ) {
             self.id = id
             self.borrower = borrower
@@ -87,6 +94,7 @@ access(all) contract TimeLendingProtocol {
             self.borrowAmount = borrowAmount
             self.durationMinutes = durationMinutes
             self.calculatedLTV = calculatedLTV
+            self.calculatedLT = calculatedLT
             self.timestamp = getCurrentBlock().timestamp
             self.repaymentDeadline = self.timestamp + UFix64(durationMinutes * 60) // Convert minutes to seconds
             self.isActive = true
@@ -169,7 +177,52 @@ access(all) contract TimeLendingProtocol {
         
         return calculatedLTV
     }
-    
+
+    access(all) view fun calculateDynamicLT(durationInMinutes: UInt64): UFix64 {
+        // Calculate c*t first
+        let exponentValue = self.ltFormulaC * Int64(durationInMinutes)
+        
+        // Calculate 2^(c*t) using binary shift operations
+        // Since we're dealing with potentially negative exponents, we need to handle both cases
+        var powerOfTwo: UFix64 = 0.0
+        
+        if exponentValue >= 0 {
+            // Positive exponent: 2^n = 1 << n
+            // Convert to UInt64 for shifting (max shift is 63 bits to avoid overflow)
+            let shiftAmount = UInt64(exponentValue)
+            if shiftAmount > 63 {
+                // Prevent overflow - cap at maximum reasonable value
+                powerOfTwo = UFix64(UInt64(1) << 63)
+            } else {
+                powerOfTwo = UFix64(UInt64(1) << shiftAmount)
+            }
+        } else {
+            // Negative exponent: 2^(-n) = 1 / (2^n) = 1 / (1 << n)
+            let positiveExponent = UInt64(-exponentValue)
+            if positiveExponent > 63 {
+                // Very small value, essentially 0
+                powerOfTwo = 0.0
+            } else {
+                let denominator = UFix64(UInt64(1) << positiveExponent)
+                powerOfTwo = 1.0 / denominator
+            }
+        }
+        
+        let calculatedLT = self.ltFormulaA + self.ltFormulaB * powerOfTwo
+        
+        // Ensure LTV doesn't exceed maximum allowed
+        if calculatedLT > self.maxLT {
+            return self.maxLT
+        }
+        
+        // Ensure LTV is not negative
+        if calculatedLT < 0.0 {
+            return 0.0
+        }
+        
+        return calculatedLT
+    }
+
     // Admin resource for protocol management
     access(all) resource Admin {
         
@@ -199,7 +252,6 @@ access(all) contract TimeLendingProtocol {
         access(all) fun addSupportedToken(tokenType: Type, vault: @{FungibleToken.Vault}) {
             TimeLendingProtocol.lendingVaults[tokenType] <-! vault
         }
-        
 
         // TODO: Ask raptor if anything goes in these 2 functions
         access(all) fun createMinter(tokenType: Type): @{IWrappedToken.Minter}? {
@@ -294,7 +346,8 @@ access(all) contract TimeLendingProtocol {
             
             // Calculate dynamic LTV based on duration in minutes
             let calculatedLTV = TimeLendingProtocol.calculateDynamicLTV(durationInMinutes: durationMinutes)
-            
+            let calculatedLT = TimeLendingProtocol.calculateDynamicLT(durationInMinutes: durationMinutes)
+
             // Check LTV ratio (simplified - would need oracle for real prices)
             let maxBorrowAmount = collateralAmount * calculatedLTV
             if borrowAmount > maxBorrowAmount {
@@ -472,6 +525,7 @@ access(all) contract TimeLendingProtocol {
                 if let position = TimeLendingProtocol.borrowingPositions[positionId] {
                     if position.isActive {
                         // Calculate new health factor based on current prices
+                        //extend to other currencies in the future
                         let newHealthFactor = self.calculateHealthFactor(positionId: positionId)
                         TimeLendingProtocol.borrowingPositions[positionId]!.updateHealthFactor(newHealthFactor: newHealthFactor)
                     }
@@ -481,6 +535,7 @@ access(all) contract TimeLendingProtocol {
         
         // Private function to calculate health factor - placeholder
         access(self) view fun calculateHealthFactor(positionId: UInt64): UFix64 {
+            //Plss debug Implemented by nawab with any flow setup
             // TODO: Implement with price oracles
             // health_factor = (collateral_value * liquidation_threshold) / debt_value
             return 1.0  // Placeholder
@@ -558,7 +613,11 @@ access(all) contract TimeLendingProtocol {
         self.ltvFormulaB = 0.40  // Exponential coefficient (40%)
         self.ltvFormulaC = -1    // Negative time multiplier (decay by factor of 2 per minute)
         
-        // Initialize position counters
+        self.ltFormulaA = 0.35  // Base LTV (30%)
+        self.ltFormulaB = 0.45  // Exponential coefficient (40%)
+        self.ltFormulaC = -1    // Negative time multiplier (decay by factor of 2 per minute)
+
+        // Initialize position counters 
         self.nextLendingPositionId = 1
         self.nextBorrowingPositionId = 1
         
