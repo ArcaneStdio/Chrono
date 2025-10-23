@@ -1,6 +1,7 @@
 import FungibleToken from 0xee82856bf20e2aa6
 import FlowToken from 0x0ae53cb6e3f42a79
 import "IWrappedToken"
+import "Oracle"
 
 access(all) contract TimeLendingProtocol {
     // Events
@@ -15,10 +16,12 @@ access(all) contract TimeLendingProtocol {
     access(all) let LendingManagerStoragePath: StoragePath
     access(all) let BorrowingManagerStoragePath: StoragePath
     access(all) let LiquidationManagerStoragePath: StoragePath
+
+    access(all) var cachedPrices: {String: UFix64}  // symbol -> price
+    access(all) var lastPriceUpdate: {String: UFix64}  // symbol -> timestamp
     
     // Protocol parameters
     access(all) var maxLTV: UFix64  // Maximum Loan-to-Value ratio (e.g., 0.75 for 75%)
-     access(all) var maxLT: UFix64  
     access(all) var liquidationThreshold: UFix64  // Liquidation threshold (e.g., 0.85 for 85%)
     access(all) var baseInterestRate: UFix64  // Base interest rate
     
@@ -69,7 +72,6 @@ access(all) contract TimeLendingProtocol {
         access(all) let borrowAmount: UFix64
         access(all) let durationMinutes: UInt64  //Duration in minutes
         access(all) let calculatedLTV: UFix64  //LTV used for this position
-        access(all) let calculatedLT: UFix64   //LT used for position
         access(all) let repaymentDeadline: UFix64
         access(all) let timestamp: UFix64
         access(all) var isActive: Bool
@@ -85,8 +87,8 @@ access(all) contract TimeLendingProtocol {
             borrowAmount: UFix64, 
             durationMinutes: UInt64,
             calculatedLTV: UFix64,
-            liquidationThreshold: UFix64
-            calculatedLT: UFix64
+            liquidationThreshold: UFix64,
+            healthFactor: UFix64
         ) {
             self.id = id
             self.borrower = borrower
@@ -96,11 +98,10 @@ access(all) contract TimeLendingProtocol {
             self.borrowAmount = borrowAmount
             self.durationMinutes = durationMinutes
             self.calculatedLTV = calculatedLTV
-            self.calculatedLT = calculatedLT
             self.timestamp = getCurrentBlock().timestamp
             self.repaymentDeadline = self.timestamp + UFix64(durationMinutes * 60) // Convert minutes to seconds
             self.isActive = true
-            self.healthFactor = 1.0  // Will be calculated based on collateral value
+            self.healthFactor = healthFactor
             self.liquidationThreshold = liquidationThreshold
         }
         
@@ -251,6 +252,8 @@ access(all) fun softLiquidatePosition(
         let collateral <- collateralVaultRef.withdraw(amount: collateralToLiquidator)
         liquidatorRecipient.deposit(from: <-collateral)
     }
+
+    let newHealthFactor = self.calculateHealthFactor(positionId: positionId)
     
     // Update position with new amounts
     let newCollateralAmount = position.collateralAmount - collateralToLiquidator
@@ -266,7 +269,8 @@ access(all) fun softLiquidatePosition(
         borrowAmount: newBorrowAmount,
         durationMinutes: position.durationMinutes,
         calculatedLTV: position.calculatedLTV,
-        liquidationThreshold: position.liquidationThreshold
+        liquidationThreshold: position.liquidationThreshold,
+        healthFactor: newHealthFactor
     )
     updatedPosition.updateHealthFactor(newHealthFactor: targetHealthFactor)
     TimeLendingProtocol.borrowingPositions[positionId] = updatedPosition
@@ -502,7 +506,6 @@ access(all) fun hardLiquidateOverduePosition(
             let calculatedLTV = TimeLendingProtocol.calculateDynamicLTV(durationInMinutes: durationMinutes)
 
             let liquidationThreshold = TimeLendingProtocol.calculateDynamicLT(durationInMinutes: durationMinutes)
-            let calculatedLT = TimeLendingProtocol.calculateDynamicLT(durationInMinutes: durationMinutes)
 
             // Check LTV ratio (simplified - would need oracle for real prices)
             let maxBorrowAmount = collateralAmount * calculatedLTV
@@ -762,6 +765,28 @@ access(all) fun hardLiquidateOverduePosition(
         }
         return overduePositions
     }
+
+    access(all) fun updateCachedPrice(symbol: String, payment: @{FungibleToken.Vault}) {
+        let priceStr = Oracle.getPrice(symbol: symbol, payment: <- payment)
+        let price = UFix64.fromString(priceStr) ?? 0.0
+        self.cachedPrices[symbol] = price
+        self.lastPriceUpdate[symbol] = getCurrentBlock().timestamp
+    }
+
+    // Then use in calculateHealthFactor:
+    access(contract) view fun calculateHealthFactor(positionId: UInt64): UFix64 {
+        let position = TimeLendingProtocol.borrowingPositions[positionId]!
+        
+        let ethPrice = TimeLendingProtocol.cachedPrices["ETH"] ?? 2000.0
+        let collateralValueUSD = position.collateralAmount * ethPrice
+        let debtValueUSD = position.borrowAmount * 1.0  // assuming USD stablecoin
+        
+        if debtValueUSD == 0.0 {
+            return 999.9
+        }
+        
+        return (collateralValueUSD * position.liquidationThreshold) / debtValueUSD
+    }
     
     init() {
         // Initialize storage paths
@@ -769,7 +794,16 @@ access(all) fun hardLiquidateOverduePosition(
         self.LendingManagerStoragePath = /storage/TimeLendingManager
         self.BorrowingManagerStoragePath = /storage/TimeBorrowingManager
         self.LiquidationManagerStoragePath = /storage/TimeLiquidationManager
+
+        self.cachedPrices = {
+            "ETH": 0.0
+        }
         
+        // Initialize last price update timestamps (set to contract deployment time)
+        self.lastPriceUpdate = {
+            "ETH": getCurrentBlock().timestamp
+        }
+
         // Initialize protocol parameters
         self.maxLTV = 0.75  // 75%
         self.liquidationThreshold = 0.85  // 85%
