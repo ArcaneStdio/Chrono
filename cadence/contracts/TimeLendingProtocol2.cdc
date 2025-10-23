@@ -251,7 +251,7 @@ access(all) contract TimeLendingProtocol {
         let position = self.borrowingPositions[positionId]!
         
         // Get current prices
-        let ethPrice = self.cachedPrices["ETH"] ?? 2000.0
+        let ethPrice = self.cachedPrices["ETH"] ?? 4000.0
         let usdPrice: UFix64 = 1.0
         
         // Calculate current collateral value in USD
@@ -284,7 +284,9 @@ access(all) contract TimeLendingProtocol {
         }
         
         // Calculate collateral to give to liquidator (with 5% bonus)
-        let liquidationBonus: UFix64 = 1.05
+        let discount = 1- (position.calculatedLTV/position.liquidationThreshold) 
+
+        let liquidationBonus: UFix64 = 1.00 + discount
         let collateralValueToLiquidateUSD = debtToRepayUSD * liquidationBonus
         let collateralToLiquidate = collateralValueToLiquidateUSD / ethPrice
         
