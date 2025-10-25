@@ -18,6 +18,12 @@
 				"testing": "01cf0e2f2f715450"
 			}
 		},
+		"WrappedETH": {
+			"source": "cadence/contracts/WrappedETH.cdc",
+			"aliases": {
+				"testing": "179b6b1cb6755e31"
+			}
+		},
 		"WrappedUSDC": {
 			"source": "cadence/contracts/WrappedUSDC.cdc",
 			"aliases": {
@@ -39,6 +45,34 @@
 				"location": "emulator-account.pkey"
 			}
 		},
+		"t1": {
+			"address": "6279503dfd482762",
+			"key": {
+				"type": "file",
+				"location": "t1.pkey"
+			}
+		},
+		"t2": {
+			"address": "861ee9e0ecb227bd",
+			"key": {
+				"type": "file",
+				"location": "t2.pkey"
+			}
+		},
+		"t3": {
+			"address": "904a8cd375b62ddc",
+			"key": {
+				"type": "file",
+				"location": "t3.pkey"
+			}
+		},
+		"t4": {
+			"address": "742d350e644c2d03",
+			"key": {
+				"type": "file",
+				"location": "t4.pkey"
+			}
+		},
 		"tRyuga": {
 			"address": "a6729879755d30b1",
 			"key": {
@@ -52,6 +86,13 @@
 				"type": "file",
 				"location": "testnet.pkey"
 			}
+		},
+		"weth": {
+			"address": "695362a431cd594b",
+			"key": {
+				"type": "file",
+				"location": "weth.pkey"
+			}
 		}
 	},
 	"deployments": {
@@ -62,8 +103,8 @@
 			]
 		},
 		"testnet": {
-			"tRyuga": [
-				"TimeLendingProtocol2"
+			"weth": [
+				"WrappedETH"
 			]
 		}
 	}
