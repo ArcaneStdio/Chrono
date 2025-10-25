@@ -1,14 +1,17 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 /*
-  Chrono Multi-Pool Stability (Solidity)
+  BridgeVault
 
-  - Supports multiple stable-token pools on one contract.
-  - Each pool (identified by stable token address) has its own:
-      P (raw->effective scaler), C (collateral per raw unit), totalRaw, totalDeposits, collateralToken.
-  - deposit/withdraw/claimCollateral/offsetDebt accept a pool token parameter.
-  - addPool lets owner register which stable tokens are supported and the corresponding collateral token.
+  Purpose:
+  - Hold user funds (ERC20 or native ETH) on EVM.
+  - Emit Deposit events that relayers consume to mint wrapped tokens on Flow.
+  - Allow authorized relayers to release funds back to users after valid burn proofs on Flow.
+
+  Security notes:
+  - The contract trusts relayers (they are authorized by owner). Use a multi-sig or DAO-controlled relayer set in production.
+  - Off-chain relayer must perform strict verification of burn proofs before calling withdraw().
 */
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -16,234 +19,169 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract StabilityPoolMulti is ReentrancyGuard, Ownable {
+contract BridgeVault is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    uint256 private constant RAY = 1e18;
+    // Sequential deposit id (global across tokens)
+    uint256 public depositIdCounter;
 
-    // Pool state per stable token address
-    mapping(address => uint256) public P; // scaled by RAY; raw -> effective: raw * P / RAY
-    mapping(address => uint256) public C; // cumulative collateral per raw unit (scaled by RAY)
-    mapping(address => uint256) public totalRaw; // sum raw shares per pool
-    mapping(address => uint256) public totalDeposits; // effective-token-units (stored nominally)
-    mapping(address => address) public collateralOf; // stableToken => collateralToken
-    mapping(address => bool) public poolExists;
+    // authorized relayers who can call withdraw
+    mapping(address => bool) public relayers;
 
-    // depositors[stableToken][user]
-    struct Depositor {
-        uint256 raw;
-        uint256 collateralSnapshot; // scaled by RAY
-        uint256 pendingCollateral;
-    }
-    mapping(address => mapping(address => Depositor)) public depositors;
+    // Optional: track deposited token totals (for monitoring)
+    mapping(address => uint256) public totalDeposited; // token address => amount
+    uint256 public totalNativeDeposited; // wei
 
-    address public protocol; // allowed to call offsetDebt
+    event RelayerSet(address indexed relayer, bool allowed);
+    /// depositId, token (0x0 for native), from, amount, targetChainId (e.g., Flow chain id), targetAddress (bytes on Flow), timestamp
+    event Deposited(
+        uint256 indexed depositId,
+        address indexed token,
+        address indexed from,
+        uint256 amount,
+        uint256 targetChainId,
+        bytes targetAddress,
+        uint256 timestamp
+    );
+    /// depositId, token (0x0 for native), to, amount, caller (relayer), timestamp
+    event Withdrawn(
+        uint256 indexed depositId,
+        address indexed token,
+        address indexed to,
+        uint256 amount,
+        address caller,
+        uint256 timestamp
+    );
 
-    event PoolAdded(address indexed stableToken, address indexed collateralToken);
-    event Deposit(address indexed poolToken, address indexed user, uint256 amount, uint256 rawAdded);
-    event Withdraw(address indexed poolToken, address indexed user, uint256 amount, uint256 rawRemoved);
-    event CollateralClaimed(address indexed poolToken, address indexed user, uint256 amount);
-    event OffsetExecuted(address indexed poolToken, address indexed caller, uint256 debtCovered, uint256 collateralReceived);
-    event ProtocolSet(address indexed protocol);
-
-    modifier onlyProtocol() {
-        require(msg.sender == protocol, "Not protocol");
+    modifier onlyRelayer() {
+        require(relayers[msg.sender], "BridgeVault: not relayer");
         _;
     }
 
-    constructor(address _protocol) {
-        protocol = _protocol;
+    constructor() {
+        depositIdCounter = 1; // start at 1 for clarity
     }
 
-    function setProtocol(address _protocol) external onlyOwner {
-        protocol = _protocol;
-        emit ProtocolSet(_protocol);
+    /// Owner controls which addresses are relayers (recommend a multisig in prod)
+    function setRelayer(address relayer, bool allowed) external onlyOwner {
+        relayers[relayer] = allowed;
+        emit RelayerSet(relayer, allowed);
     }
 
-    // Admin: register a new stable token pool and its collateral token
-    function addPool(address stableToken, address collateralToken) external onlyOwner {
-        require(stableToken != address(0), "zero stable");
-        require(collateralToken != address(0), "zero collateral");
-        require(!poolExists[stableToken], "pool exists");
+    // -----------------
+    // DEPOSITS
+    // -----------------
 
-        poolExists[stableToken] = true;
-        collateralOf[stableToken] = collateralToken;
+    /// @notice Deposit ERC20 token to be bridged. `targetAddress` is the recipient on Flow (opaque bytes)
+    /// @param token ERC20 token address (use 0x0 for native? For ERC20 only; native has separate function)
+    /// @param amount token amount (ERC20 decimals respected)
+    /// @param targetChainId target chain id (for relayer routing) — use your Flow chain id
+    /// @param targetAddress encoded target address on Flow (e.g., user Flow address bytes)
+    function depositERC20(
+        address token,
+        uint256 amount,
+        uint256 targetChainId,
+        bytes calldata targetAddress
+    ) external nonReentrant {
+        require(token != address(0), "BridgeVault: token==0");
+        require(amount > 0, "BridgeVault: amount==0");
 
-        // initialize scalers
-        P[stableToken] = RAY;
-        C[stableToken] = 0;
-        totalRaw[stableToken] = 0;
-        totalDeposits[stableToken] = 0;
+        // transfer token in
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
-        emit PoolAdded(stableToken, collateralToken);
+        // update accounting
+        totalDeposited[token] += amount;
+
+        uint256 id = depositIdCounter++;
+        emit Deposited(id, token, msg.sender, amount, targetChainId, targetAddress, block.timestamp);
     }
 
-    // --- Helpers per pool ---
+    /// @notice Deposit native ETH to be bridged (wrap targetAddress similarly)
+    /// @param targetChainId target chain id (Flow)
+    /// @param targetAddress encoded target address on Flow
+    function depositNative(uint256 targetChainId, bytes calldata targetAddress) external payable nonReentrant {
+        require(msg.value > 0, "BridgeVault: value==0");
 
-    function rawToEffective(address poolToken, uint256 raw) public view returns (uint256) {
-        return (raw * P[poolToken]) / RAY;
+        totalNativeDeposited += msg.value;
+
+        uint256 id = depositIdCounter++;
+        emit Deposited(id, address(0), msg.sender, msg.value, targetChainId, targetAddress, block.timestamp);
     }
 
-    function effectiveToRaw(address poolToken, uint256 effective) public view returns (uint256) {
-        require(P[poolToken] > 0, "P==0");
-        return (effective * RAY) / P[poolToken];
-    }
+    // -----------------
+    // WITHDRAW (called by relayer after burn proof)
+    // -----------------
 
-    function effectiveBalanceOf(address poolToken, address user) external view returns (uint256) {
-        return rawToEffective(poolToken, depositors[poolToken][user].raw);
-    }
+    /// @notice Relayer releases ERC20 tokens to recipient after verifying burn on Flow
+    /// @param depositId id for tracking — useful for relayer off-chain logs
+    /// @param token ERC20 token address
+    /// @param to destination address on EVM
+    /// @param amount amount to send
+    function withdrawERC20(
+        uint256 depositId,
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyRelayer nonReentrant {
+        require(token != address(0), "BridgeVault: token==0");
+        require(to != address(0), "BridgeVault: to==0");
+        require(amount > 0, "BridgeVault: amount==0");
 
-    function totalEffectiveSupply(address poolToken) public view returns (uint256) {
-        return rawToEffective(poolToken, totalRaw[poolToken]);
-    }
-
-    function claimableCollateralOf(address poolToken, address user) public view returns (uint256) {
-        Depositor storage d = depositors[poolToken][user];
-        uint256 deltaC = C[poolToken] - d.collateralSnapshot; // scaled by RAY
-        uint256 gain = (d.raw * deltaC) / RAY;
-        return d.pendingCollateral + gain;
-    }
-
-    // --- User actions ---
-
-    function deposit(address poolToken, uint256 amount) external nonReentrant {
-        require(poolExists[poolToken], "pool not registered");
-        require(amount > 0, "amount>0");
-        address user = msg.sender;
-
-        // Reinit P if emptied
-        if (P[poolToken] == 0) {
-            P[poolToken] = RAY;
-        }
-
-        _updateUserGains(poolToken, user);
-
-        uint256 rawAdded = (amount * RAY) / P[poolToken];
-        require(rawAdded > 0, "rawAdded==0");
-
-        IERC20(poolToken).safeTransferFrom(user, address(this), amount);
-
-        depositors[poolToken][user].raw += rawAdded;
-        totalRaw[poolToken] += rawAdded;
-
-        totalDeposits[poolToken] += amount;
-
-        depositors[poolToken][user].collateralSnapshot = C[poolToken];
-
-        emit Deposit(poolToken, user, amount, rawAdded);
-    }
-
-    function withdraw(address poolToken, uint256 amount) external nonReentrant {
-        require(poolExists[poolToken], "pool not registered");
-        require(amount > 0, "amount>0");
-        address user = msg.sender;
-
-        _updateUserGains(poolToken, user);
-
-        uint256 effective = rawToEffective(poolToken, depositors[poolToken][user].raw);
-        require(amount <= effective, "insufficient balance");
-
-        uint256 rawRemove = (amount * RAY) / P[poolToken];
-
-        // rounding safety
-        if (rawRemove > depositors[poolToken][user].raw) {
-            rawRemove = depositors[poolToken][user].raw;
-        }
-
-        depositors[poolToken][user].raw -= rawRemove;
-        totalRaw[poolToken] -= rawRemove;
-
-        totalDeposits[poolToken] -= amount;
-
-        IERC20(poolToken).safeTransfer(user, amount);
-
-        emit Withdraw(poolToken, user, amount, rawRemove);
-    }
-
-    function claimCollateral(address poolToken) external nonReentrant {
-        require(poolExists[poolToken], "pool not registered");
-        address user = msg.sender;
-        _updateUserGains(poolToken, user);
-
-        uint256 toClaim = depositors[poolToken][user].pendingCollateral;
-        require(toClaim > 0, "no collateral");
-
-        depositors[poolToken][user].pendingCollateral = 0;
-
-        IERC20(collateralOf[poolToken]).safeTransfer(user, toClaim);
-
-        emit CollateralClaimed(poolToken, user, toClaim);
-    }
-
-    function _updateUserGains(address poolToken, address user) internal {
-        Depositor storage d = depositors[poolToken][user];
-
-        if (d.raw == 0) {
-            d.collateralSnapshot = C[poolToken];
-            return;
-        }
-
-        uint256 deltaC = C[poolToken] - d.collateralSnapshot;
-        if (deltaC > 0) {
-            uint256 gain = (d.raw * deltaC) / RAY;
-            d.pendingCollateral += gain;
-        }
-        d.collateralSnapshot = C[poolToken];
-    }
-
-    // --- Protocol / Liquidation ---
-
-    // protocol covers debt in poolToken units; collateralAmount is collateralToken units
-    function offsetDebt(address poolToken, uint256 debtToCover, uint256 collateralAmount) external nonReentrant onlyProtocol {
-        require(poolExists[poolToken], "pool not registered");
-        require(debtToCover > 0, "debt>0");
-
-        uint256 totalEffective = rawToEffective(poolToken, totalRaw[poolToken]);
-        require(totalEffective > 0, "empty pool");
-
-        uint256 debtCovered = debtToCover;
-        if (debtCovered >= totalEffective) {
-            debtCovered = totalEffective;
-        }
-
-        // 1) Distribute collateral proportionally to raw units using totalRaw
-        if (collateralAmount > 0) {
-            require(totalRaw[poolToken] > 0, "no raw supply");
-            IERC20(collateralOf[poolToken]).safeTransferFrom(msg.sender, address(this), collateralAmount);
-
-            uint256 deltaC = (collateralAmount * RAY) / totalRaw[poolToken];
-            C[poolToken] += deltaC;
-        }
-
-        // 2) Reduce effective balances via multiplicative factor
-        if (debtCovered == totalEffective) {
-            // drain entire pool
-            P[poolToken] = 0;
-            totalDeposits[poolToken] = 0;
-            // transfer actual token balance of pool to protocol (defensive)
-            uint256 bal = IERC20(poolToken).balanceOf(address(this));
-            if (bal > 0) {
-                IERC20(poolToken).safeTransfer(protocol, bal);
-            }
-        } else {
-            uint256 numerator = (totalEffective - debtCovered) * RAY;
-            uint256 denominator = totalEffective;
-            uint256 factor = numerator / denominator; // scaled by RAY
-
-            P[poolToken] = (P[poolToken] * factor) / RAY;
-
-            totalDeposits[poolToken] = (totalDeposits[poolToken] * factor) / RAY;
-
-            // transfer the exact tokens corresponding to debtCovered
-            IERC20(poolToken).safeTransfer(protocol, debtCovered);
-        }
-
-        emit OffsetExecuted(poolToken, msg.sender, debtCovered, collateralAmount);
-    }
-
-    // Admin: recover accidentally sent ERC20s (owner)
-    function recoverERC20(address token, address to, uint256 amount) external onlyOwner {
-        require(to != address(0), "zero to");
+        // transfer out
         IERC20(token).safeTransfer(to, amount);
+
+        // update accounting (best-effort; doesn't underflow protections for malicious calls)
+        if (totalDeposited[token] >= amount) {
+            totalDeposited[token] -= amount;
+        } else {
+            totalDeposited[token] = 0;
+        }
+
+        emit Withdrawn(depositId, token, to, amount, msg.sender, block.timestamp);
+    }
+
+    /// @notice Relayer releases native ETH to recipient after verifying burn on Flow
+    function withdrawNative(
+        uint256 depositId,
+        address payable to,
+        uint256 amount
+    ) external onlyRelayer nonReentrant {
+        require(to != address(0), "BridgeVault: to==0");
+        require(amount > 0, "BridgeVault: amount==0");
+
+        // transfer
+        (bool ok, ) = to.call{value: amount}("");
+        require(ok, "BridgeVault: native transfer failed");
+
+        if (totalNativeDeposited >= amount) {
+            totalNativeDeposited -= amount;
+        } else {
+            totalNativeDeposited = 0;
+        }
+
+        emit Withdrawn(depositId, address(0), to, amount, msg.sender, block.timestamp);
+    }
+
+    // -----------------
+    // ADMIN / RECOVERY
+    // -----------------
+
+    /// Owner can recover tokens accidentally sent (not part of normal flow)
+    function recoverERC20(address token, address to, uint256 amount) external onlyOwner {
+        require(to != address(0), "BridgeVault: to==0");
+        IERC20(token).safeTransfer(to, amount);
+    }
+
+    /// Owner can recover native ETH accidentally sent
+    function recoverNative(address payable to, uint256 amount) external onlyOwner {
+        require(to != address(0), "BridgeVault: to==0");
+        (bool ok, ) = to.call{value: amount}("");
+        require(ok, "BridgeVault: recover native failed");
+    }
+
+    // Allow contract to receive ETH via fallback (if needed)
+    receive() external payable {
+        totalNativeDeposited += msg.value;
+        // not emitting Deposited for plain send — caller should use depositNative for bridge deposits
     }
 }
