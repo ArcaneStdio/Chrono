@@ -18,8 +18,8 @@
 				"testing": "01cf0e2f2f715450"
 			}
 		},
-		"WrappedETH": {
-			"source": "cadence/contracts/WrappedETH.cdc",
+		"WrappedETH1": {
+			"source": "cadence/contracts/WrappedETH1.cdc",
 			"aliases": {
 				"testing": "179b6b1cb6755e31"
 			}
@@ -28,6 +28,12 @@
 			"source": "cadence/contracts/WrappedUSDC.cdc",
 			"aliases": {
 				"testing": "179b6b1cb6755e31"
+			}
+		},
+		"WrappedETH2": {
+			"source": "cadence/contracts/WrappedETH2.cdc",
+			"aliases": {
+				"testnet": "695362a431cd594b"
 			}
 		}
 	},
@@ -103,8 +109,8 @@
 			]
 		},
 		"testnet": {
-			"weth": [
-				"WrappedETH"
+			"testnet": [
+				"WrappedETH1"
 			]
 		}
 	}
