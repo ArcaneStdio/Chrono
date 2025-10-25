@@ -1,9 +1,9 @@
-import FungibleToken from 0xee82856bf20e2aa6
-import FlowToken from 0x0ae53cb6e3f42a79
-import "IWrappedToken"
-import "Oracle"
+import FungibleToken from 0x9a0766d93b6608b7
+import FlowToken from 0x7e60df042a9c0868
+import IWrappedToken from 0xa6729879755d30b1
+import Oracle from  0xa6729879755d30b1
 
-access(all) contract TimeLendingProtocol {
+access(all) contract TimeLendingProtocol2 {
     // Events
     access(all) event LendingPositionCreated(lender: Address, amount: UFix64, tokenType: Type, positionId: UInt64)
     access(all) event BorrowingPositionCreated(borrower: Address, collateralAmount: UFix64, borrowAmount: UFix64, positionId: UInt64, durationMinutes: UInt64, calculatedLTV: UFix64, liquidationThreshold: UFix64, healthFactor: UFix64)
@@ -274,69 +274,69 @@ access(all) contract TimeLendingProtocol {
         if debtToRepayUSD <= 0.0 {
             destroy repaymentVault
             panic("No liquidation needed, position already healthy enough")
-        }
-        
-        // Check repayment vault has enough
-        if repaymentVault.balance < debtToRepayUSD {
+        }else if repaymentVault.balance < debtToRepayUSD {
             let balance = repaymentVault.balance
             destroy repaymentVault
             panic("Insufficient repayment. Required: ".concat(debtToRepayUSD.toString()).concat(", Provided: ").concat(balance.toString()))
-        }
-        
-        // Calculate collateral to give to liquidator (with 5% bonus)
-        let discount = 1- (position.calculatedLTV/position.liquidationThreshold) 
+        }else {
+            
+            
+            // Check repayment vault has enough
+            
+            // Calculate collateral to give to liquidator (with 5% bonus)
+            let discount = UFix64(1) - (position.calculatedLTV/position.liquidationThreshold) 
 
-        let liquidationBonus: UFix64 = 1.00 + discount
-        let collateralValueToLiquidateUSD = debtToRepayUSD * liquidationBonus
-        let collateralToLiquidate = collateralValueToLiquidateUSD / ethPrice
-        
-        // Ensure we don't try to withdraw more collateral than available
-        if collateralToLiquidate > position.collateralAmount {
-            destroy repaymentVault
-            panic("Calculated collateral exceeds available collateral")
+            let liquidationBonus: UFix64 = 1.00 + discount
+            let collateralValueToLiquidateUSD = debtToRepayUSD * liquidationBonus
+            let collateralToLiquidate = collateralValueToLiquidateUSD / ethPrice
+            
+            // Ensure we don't try to withdraw more collateral than available
+            if collateralToLiquidate > position.collateralAmount {
+                destroy repaymentVault
+                panic("Calculated collateral exceeds available collateral")
+            }else if self.lendingVaults[position.borrowTokenType] != nil {
+            // Deposit repayment into lending vault
+                let vaultRef = (&self.lendingVaults[position.borrowTokenType] as &{FungibleToken.Vault}?)!
+                let exactRepayment <- repaymentVault.withdraw(amount: debtToRepayUSD)
+                vaultRef.deposit(from: <-exactRepayment)
+                destroy repaymentVault
+            } else {
+                let exactRepayment <- repaymentVault.withdraw(amount: debtToRepayUSD)
+                self.lendingVaults[position.borrowTokenType] <-! exactRepayment
+                // Return excess repayment to liquidator if any
+                if repaymentVault.balance > 0.0 {
+                    liquidatorRecipient.deposit(from: <-repaymentVault)
+                } else {
+                    destroy repaymentVault
+                }
+            }
+            
+            
+            // Transfer collateral to liquidator
+            if let collateralVaultRef = &self.collateralVaults[position.collateralType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}? {
+                let collateral <- collateralVaultRef.withdraw(amount: collateralToLiquidate)
+                liquidatorRecipient.deposit(from: <-collateral)
+            }
+            
+            // Update position with new amounts
+            let newCollateralAmount = position.collateralAmount - collateralToLiquidate
+            let newBorrowAmount = position.borrowAmount - debtToRepayUSD
+            
+            // Update the position in storage
+            self.borrowingPositions[positionId]!.updateAmounts(newCollateral: newCollateralAmount, newBorrow: newBorrowAmount)
+            
+            // Recalculate and update health factor
+            let newHealthFactor = self.calculateHealthFactor(positionId: positionId)
+            self.borrowingPositions[positionId]!.updateHealthFactor(newHealthFactor: newHealthFactor)
+            
+            emit PositionLiquidated(
+                positionId: positionId, 
+                liquidator: liquidator, 
+                liquidationType: "SoftLiquidation",
+                collateralLiquidated: collateralToLiquidate,
+                debtRepaid: debtToRepayUSD
+            )
         }
-        
-        // Deposit repayment into lending vault
-        if self.lendingVaults[position.borrowTokenType] != nil {
-            let vaultRef = (&self.lendingVaults[position.borrowTokenType] as &{FungibleToken.Vault}?)!
-            let exactRepayment <- repaymentVault.withdraw(amount: debtToRepayUSD)
-            vaultRef.deposit(from: <-exactRepayment)
-        } else {
-            let exactRepayment <- repaymentVault.withdraw(amount: debtToRepayUSD)
-            self.lendingVaults[position.borrowTokenType] <-! exactRepayment
-        }
-        
-        // Return excess repayment to liquidator if any
-        if repaymentVault.balance > 0.0 {
-            liquidatorRecipient.deposit(from: <-repaymentVault)
-        } else {
-            destroy repaymentVault
-        }
-        
-        // Transfer collateral to liquidator
-        if let collateralVaultRef = &self.collateralVaults[position.collateralType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}? {
-            let collateral <- collateralVaultRef.withdraw(amount: collateralToLiquidate)
-            liquidatorRecipient.deposit(from: <-collateral)
-        }
-        
-        // Update position with new amounts
-        let newCollateralAmount = position.collateralAmount - collateralToLiquidate
-        let newBorrowAmount = position.borrowAmount - debtToRepayUSD
-        
-        // Update the position in storage
-        self.borrowingPositions[positionId]!.updateAmounts(newCollateral: newCollateralAmount, newBorrow: newBorrowAmount)
-        
-        // Recalculate and update health factor
-        let newHealthFactor = self.calculateHealthFactor(positionId: positionId)
-        self.borrowingPositions[positionId]!.updateHealthFactor(newHealthFactor: newHealthFactor)
-        
-        emit PositionLiquidated(
-            positionId: positionId, 
-            liquidator: liquidator, 
-            liquidationType: "SoftLiquidation",
-            collateralLiquidated: collateralToLiquidate,
-            debtRepaid: debtToRepayUSD
-        )
     }
 
     // Hard Liquidation - Full liquidation for overdue positions
@@ -365,41 +365,43 @@ access(all) contract TimeLendingProtocol {
             let balance = repaymentVault.balance
             destroy repaymentVault
             panic("Insufficient repayment for full liquidation. Required: ".concat(totalDebt.toString()).concat(", Provided: ").concat(balance.toString()))
+        }else {
+            
+            // Deposit full repayment into lending vault
+            if self.lendingVaults[position.borrowTokenType] != nil {
+                let vaultRef = (&self.lendingVaults[position.borrowTokenType] as &{FungibleToken.Vault}?)!
+                let exactRepayment <- repaymentVault.withdraw(amount: totalDebt)
+                vaultRef.deposit(from: <-exactRepayment)
+            } else {
+                let exactRepayment <- repaymentVault.withdraw(amount: totalDebt)
+                self.lendingVaults[position.borrowTokenType] <-! exactRepayment
+            }
+            
+            // Return excess repayment to liquidator if any
+            if repaymentVault.balance > 0.0 {
+                liquidatorRecipient.deposit(from: <-repaymentVault)
+            } else {
+                destroy repaymentVault
+            }
+            
+            // Transfer ALL collateral to liquidator
+            if let collateralVaultRef = &self.collateralVaults[position.collateralType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}? {
+                let collateral <- collateralVaultRef.withdraw(amount: position.collateralAmount)
+                liquidatorRecipient.deposit(from: <-collateral)
+            }
+            
+            // Close position completely
+            self.borrowingPositions[positionId]!.close()
+            
+            emit PositionLiquidated(
+                positionId: positionId, 
+                liquidator: liquidator, 
+                liquidationType: "HardLiquidation",
+                collateralLiquidated: position.collateralAmount,
+                debtRepaid: totalDebt
+            )
         }
         
-        // Deposit full repayment into lending vault
-        if self.lendingVaults[position.borrowTokenType] != nil {
-            let vaultRef = (&self.lendingVaults[position.borrowTokenType] as &{FungibleToken.Vault}?)!
-            let exactRepayment <- repaymentVault.withdraw(amount: totalDebt)
-            vaultRef.deposit(from: <-exactRepayment)
-        } else {
-            let exactRepayment <- repaymentVault.withdraw(amount: totalDebt)
-            self.lendingVaults[position.borrowTokenType] <-! exactRepayment
-        }
-        
-        // Return excess repayment to liquidator if any
-        if repaymentVault.balance > 0.0 {
-            liquidatorRecipient.deposit(from: <-repaymentVault)
-        } else {
-            destroy repaymentVault
-        }
-        
-        // Transfer ALL collateral to liquidator
-        if let collateralVaultRef = &self.collateralVaults[position.collateralType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}? {
-            let collateral <- collateralVaultRef.withdraw(amount: position.collateralAmount)
-            liquidatorRecipient.deposit(from: <-collateral)
-        }
-        
-        // Close position completely
-        self.borrowingPositions[positionId]!.close()
-        
-        emit PositionLiquidated(
-            positionId: positionId, 
-            liquidator: liquidator, 
-            liquidationType: "HardLiquidation",
-            collateralLiquidated: position.collateralAmount,
-            debtRepaid: totalDebt
-        )
     }
 
     // Admin resource
@@ -409,42 +411,42 @@ access(all) contract TimeLendingProtocol {
             pre {
                 newLTV <= 1.0: "LTV cannot exceed 100%"
             }
-            TimeLendingProtocol.maxLTV = newLTV
+            TimeLendingProtocol2.maxLTV = newLTV
         }
         
         access(all) fun updateMaxLT(newMaxLT: UFix64) {
             pre {
                 newMaxLT <= 1.0: "LT cannot exceed 100%"
             }
-            TimeLendingProtocol.maxLT = newMaxLT
+            TimeLendingProtocol2.maxLT = newMaxLT
         }
         
         access(all) fun updateLiquidationThreshold(newThreshold: UFix64) {
-            TimeLendingProtocol.liquidationThreshold = newThreshold
+            TimeLendingProtocol2.liquidationThreshold = newThreshold
         }
         
         access(all) fun updateInterestRate(newRate: UFix64) {
-            TimeLendingProtocol.baseInterestRate = newRate
+            TimeLendingProtocol2.baseInterestRate = newRate
         }
         
         access(all) fun updateLTVFormulaParameters(a: UFix64, b: UFix64, c: Int64) {
-            TimeLendingProtocol.ltvFormulaA = a
-            TimeLendingProtocol.ltvFormulaB = b
-            TimeLendingProtocol.ltvFormulaC = c
+            TimeLendingProtocol2.ltvFormulaA = a
+            TimeLendingProtocol2.ltvFormulaB = b
+            TimeLendingProtocol2.ltvFormulaC = c
             
             emit LTVParametersUpdated(a: a, b: b, c: UFix64(c))
         }
         
         access(all) fun updateLTFormulaParameters(a: UFix64, b: UFix64, c: Int64) {
-            TimeLendingProtocol.ltFormulaA = a
-            TimeLendingProtocol.ltFormulaB = b
-            TimeLendingProtocol.ltFormulaC = c
+            TimeLendingProtocol2.ltFormulaA = a
+            TimeLendingProtocol2.ltFormulaB = b
+            TimeLendingProtocol2.ltFormulaC = c
             
             emit LTParametersUpdated(a: a, b: b, c: UFix64(c))
         }
         
         access(all) fun addSupportedToken(tokenType: Type, vault: @{FungibleToken.Vault}) {
-            TimeLendingProtocol.lendingVaults[tokenType] <-! vault
+            TimeLendingProtocol2.lendingVaults[tokenType] <-! vault
         }
 
         access(all) fun createMinter(tokenType: Type): @{IWrappedToken.Minter}? {
@@ -463,17 +465,17 @@ access(all) contract TimeLendingProtocol {
             tokenVault: @{FungibleToken.Vault},
             lender: Address
         ): UInt64 {
-            let positionId = TimeLendingProtocol.nextLendingPositionId
-            TimeLendingProtocol.nextLendingPositionId = positionId + 1
+            let positionId = TimeLendingProtocol2.nextLendingPositionId
+            TimeLendingProtocol2.nextLendingPositionId = positionId + 1
             
             let tokenType = tokenVault.getType()
             let amount = tokenVault.balance
             
-            if TimeLendingProtocol.lendingVaults[tokenType] != nil {
-                let vaultRef = (&TimeLendingProtocol.lendingVaults[tokenType] as &{FungibleToken.Vault}?)!
+            if TimeLendingProtocol2.lendingVaults[tokenType] != nil {
+                let vaultRef = (&TimeLendingProtocol2.lendingVaults[tokenType] as &{FungibleToken.Vault}?)!
                 vaultRef.deposit(from: <-tokenVault)
             } else {
-                TimeLendingProtocol.lendingVaults[tokenType] <-! tokenVault
+                TimeLendingProtocol2.lendingVaults[tokenType] <-! tokenVault
             }
             
             let position = LendingPosition(
@@ -483,7 +485,7 @@ access(all) contract TimeLendingProtocol {
                 amount: amount
             )
             
-            TimeLendingProtocol.lendingPositions[positionId] = position
+            TimeLendingProtocol2.lendingPositions[positionId] = position
             
             emit LendingPositionCreated(
                 lender: lender,
@@ -497,18 +499,18 @@ access(all) contract TimeLendingProtocol {
         
         access(all) fun withdrawLending(positionId: UInt64, recipient: &{FungibleToken.Receiver}) {
             pre {
-                TimeLendingProtocol.lendingPositions[positionId] != nil: "Position does not exist"
-                TimeLendingProtocol.lendingPositions[positionId]!.isActive: "Position is not active"
+                TimeLendingProtocol2.lendingPositions[positionId] != nil: "Position does not exist"
+                TimeLendingProtocol2.lendingPositions[positionId]!.isActive: "Position is not active"
             }
             
-            let position = TimeLendingProtocol.lendingPositions[positionId]!
+            let position = TimeLendingProtocol2.lendingPositions[positionId]!
             let tokenType = position.tokenType
             
-            if let vaultRef = &TimeLendingProtocol.lendingVaults[tokenType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}? {
+            if let vaultRef = &TimeLendingProtocol2.lendingVaults[tokenType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}? {
                 let withdrawnTokens <- vaultRef.withdraw(amount: position.amount)
                 recipient.deposit(from: <-withdrawnTokens)
                 
-                TimeLendingProtocol.lendingPositions[positionId]!.deactivate()
+                TimeLendingProtocol2.lendingPositions[positionId]!.deactivate()
             }
         }
     }
@@ -523,18 +525,18 @@ access(all) contract TimeLendingProtocol {
             durationMinutes: UInt64,
             borrower: Address
         ): UInt64? {
-            let positionId = TimeLendingProtocol.nextBorrowingPositionId
-            TimeLendingProtocol.nextBorrowingPositionId = positionId + 1
+            let positionId = TimeLendingProtocol2.nextBorrowingPositionId
+            TimeLendingProtocol2.nextBorrowingPositionId = positionId + 1
             
             let collateralType = collateralVault.getType()
             let collateralAmount = collateralVault.balance
             
             // Calculate dynamic LTV and LT
-            let calculatedLTV = TimeLendingProtocol.calculateDynamicLTV(durationInMinutes: durationMinutes)
-            let liquidationThreshold = TimeLendingProtocol.calculateDynamicLT(durationInMinutes: durationMinutes)
+            let calculatedLTV = TimeLendingProtocol2.calculateDynamicLTV(durationInMinutes: durationMinutes)
+            let liquidationThreshold = TimeLendingProtocol2.calculateDynamicLT(durationInMinutes: durationMinutes)
             
             // Get current ETH price
-            let ethPrice = TimeLendingProtocol.cachedPrices["ETH"] ?? 2000.0
+            let ethPrice = TimeLendingProtocol2.cachedPrices["ETH"] ?? 2000.0
             
             // Calculate max borrow amount in USD
             let collateralValueUSD = collateralAmount * ethPrice
@@ -546,11 +548,11 @@ access(all) contract TimeLendingProtocol {
             }
             
             // Store collateral
-            if TimeLendingProtocol.collateralVaults[collateralType] != nil {
-                let vaultRef = (&TimeLendingProtocol.collateralVaults[collateralType] as &{FungibleToken.Vault}?)!
+            if TimeLendingProtocol2.collateralVaults[collateralType] != nil {
+                let vaultRef = (&TimeLendingProtocol2.collateralVaults[collateralType] as &{FungibleToken.Vault}?)!
                 vaultRef.deposit(from: <-collateralVault)
             } else {
-                TimeLendingProtocol.collateralVaults[collateralType] <-! collateralVault
+                TimeLendingProtocol2.collateralVaults[collateralType] <-! collateralVault
             }
             
             // Calculate initial health factor
@@ -570,7 +572,7 @@ access(all) contract TimeLendingProtocol {
                 healthFactor: initialHealthFactor
             )
             
-            TimeLendingProtocol.borrowingPositions[positionId] = position
+            TimeLendingProtocol2.borrowingPositions[positionId] = position
             
             emit BorrowingPositionCreated(
                 borrower: borrower,
@@ -592,15 +594,15 @@ access(all) contract TimeLendingProtocol {
             collateralRecipient: &{FungibleToken.Receiver}
         ) {
             pre {
-                TimeLendingProtocol.borrowingPositions[positionId] != nil: "Position does not exist"
-                TimeLendingProtocol.borrowingPositions[positionId]!.isActive: "Position is not active"
+                TimeLendingProtocol2.borrowingPositions[positionId] != nil: "Position does not exist"
+                TimeLendingProtocol2.borrowingPositions[positionId]!.isActive: "Position is not active"
             }
             
-            let position = TimeLendingProtocol.borrowingPositions[positionId]!
+            let position = TimeLendingProtocol2.borrowingPositions[positionId]!
             
             // Calculate interest
             let timeElapsed = getCurrentBlock().timestamp - position.timestamp
-            let annualRate = TimeLendingProtocol.baseInterestRate
+            let annualRate = TimeLendingProtocol2.baseInterestRate
             let interest = position.borrowAmount * annualRate * timeElapsed / 31536000.0
             let totalRepayment = position.borrowAmount + interest
             
@@ -608,33 +610,35 @@ access(all) contract TimeLendingProtocol {
                 let repaymentBalance = repaymentVault.balance
                 destroy repaymentVault
                 panic("Insufficient repayment amount. Required: ".concat(totalRepayment.toString()).concat(", Provided: ").concat(repaymentBalance.toString()))
-            }
-            
-            // Deposit repayment
-            if TimeLendingProtocol.lendingVaults[position.borrowTokenType] != nil {
-                let vaultRef = (&TimeLendingProtocol.lendingVaults[position.borrowTokenType] as &{FungibleToken.Vault}?)!
+            }else {
                 
-                if repaymentVault.balance > totalRepayment {
-                    let exactRepayment <- repaymentVault.withdraw(amount: totalRepayment)
-                    vaultRef.deposit(from: <-exactRepayment)
-                    destroy repaymentVault
+                // Deposit repayment
+                if TimeLendingProtocol2.lendingVaults[position.borrowTokenType] != nil {
+                    let vaultRef = (&TimeLendingProtocol2.lendingVaults[position.borrowTokenType] as &{FungibleToken.Vault}?)!
+                    
+                    if repaymentVault.balance > totalRepayment {
+                        let exactRepayment <- repaymentVault.withdraw(amount: totalRepayment)
+                        vaultRef.deposit(from: <-exactRepayment)
+                        destroy repaymentVault
+                    } else {
+                        vaultRef.deposit(from: <-repaymentVault)
+                    }
                 } else {
-                    vaultRef.deposit(from: <-repaymentVault)
+                    TimeLendingProtocol2.lendingVaults[position.borrowTokenType] <-! repaymentVault
                 }
-            } else {
-                TimeLendingProtocol.lendingVaults[position.borrowTokenType] <-! repaymentVault
+                
+                // Return collateral
+                if let collateralVaultRef = &TimeLendingProtocol2.collateralVaults[position.collateralType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}? {
+                    let collateral <- collateralVaultRef.withdraw(amount: position.collateralAmount)
+                    collateralRecipient.deposit(from: <-collateral)
+                }
+                
+                // Close position
+                TimeLendingProtocol2.borrowingPositions[positionId]!.close()
+                
+                emit PositionRepaid(positionId: positionId, borrower: position.borrower, totalRepayment: totalRepayment)
             }
             
-            // Return collateral
-            if let collateralVaultRef = &TimeLendingProtocol.collateralVaults[position.collateralType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}? {
-                let collateral <- collateralVaultRef.withdraw(amount: position.collateralAmount)
-                collateralRecipient.deposit(from: <-collateral)
-            }
-            
-            // Close position
-            TimeLendingProtocol.borrowingPositions[positionId]!.close()
-            
-            emit PositionRepaid(positionId: positionId, borrower: position.borrower, totalRepayment: totalRepayment)
         }
     }
     
@@ -643,12 +647,12 @@ access(all) contract TimeLendingProtocol {
         
         access(all) fun updateHealthFactors(positionIds: [UInt64]) {
             for positionId in positionIds {
-                if let position = TimeLendingProtocol.borrowingPositions[positionId] {
+                if let position = TimeLendingProtocol2.borrowingPositions[positionId] {
                     if position.isActive {
                         let oldHealthFactor = position.healthFactor
-                        let newHealthFactor = TimeLendingProtocol.calculateHealthFactor(positionId: positionId)
+                        let newHealthFactor = TimeLendingProtocol2.calculateHealthFactor(positionId: positionId)
                         
-                        TimeLendingProtocol.borrowingPositions[positionId]!.updateHealthFactor(newHealthFactor: newHealthFactor)
+                        TimeLendingProtocol2.borrowingPositions[positionId]!.updateHealthFactor(newHealthFactor: newHealthFactor)
                         
                         emit HealthFactorUpdated(
                             positionId: positionId,

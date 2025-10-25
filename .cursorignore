@@ -5,3 +5,4 @@ emulator-account.pkey
 # Pay attention to imports directory
 !imports
 testnet.pkey
+tRyuga.pkey

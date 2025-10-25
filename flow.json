@@ -1,25 +1,25 @@
 {
 	"contracts": {
+		"IWrappedToken": {
+			"source": "cadence/contracts/IWrappedToken.cdc",
+			"aliases": {
+				"testing": "179b6b1cb6755e31"
+			}
+		},
 		"Oracle": {
 			"source": "cadence/contracts/Oracle.cdc",
 			"aliases": {
 				"testing": "0000000000000008"
 			}
 		},
-		"TimeLendingProtocol": {
-			"source": "cadence/contracts/TimeLendingProtocol.cdc",
+		"TimeLendingProtocol2": {
+			"source": "cadence/contracts/TimeLendingProtocol2.cdc",
 			"aliases": {
 				"testing": "01cf0e2f2f715450"
 			}
 		},
 		"WrappedUSDC": {
 			"source": "cadence/contracts/WrappedUSDC.cdc",
-			"aliases": {
-				"testing": "179b6b1cb6755e31"
-			}
-		},
-		"IWrappedToken": {
-			"source": "cadence/contracts/IWrappedToken.cdc",
 			"aliases": {
 				"testing": "179b6b1cb6755e31"
 			}
@@ -39,6 +39,13 @@
 				"location": "emulator-account.pkey"
 			}
 		},
+		"tRyuga": {
+			"address": "a6729879755d30b1",
+			"key": {
+				"type": "file",
+				"location": "tRyuga.pkey"
+			}
+		},
 		"testnet": {
 			"address": "e11cab85e85ae137",
 			"key": {
@@ -48,15 +55,15 @@
 		}
 	},
 	"deployments": {
-		"emulator":{
+		"emulator": {
 			"emulator-account": [
 				"IWrappedToken",
-				"TimeLendingProtocol"
+				"TimeLendingProtocol2"
 			]
 		},
 		"testnet": {
-			"testnet": [
-				"Oracle"
+			"tRyuga": [
+				"TimeLendingProtocol2"
 			]
 		}
 	}
