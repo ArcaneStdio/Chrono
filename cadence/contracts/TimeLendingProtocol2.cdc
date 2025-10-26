@@ -587,6 +587,66 @@ access(all) contract TimeLendingProtocol2 {
             
             return positionId
         }
+
+        // Add this function to the BorrowingManager resource
+
+        access(all) fun borrowMore(
+            positionId: UInt64,
+            additionalBorrowAmount: UFix64,
+            borrowedTokensRecipient: &{FungibleToken.Receiver}
+        ) {
+            pre {
+                TimeLendingProtocol2.borrowingPositions[positionId] != nil: "Position does not exist"
+                TimeLendingProtocol2.borrowingPositions[positionId]!.isActive: "Position is not active"
+                additionalBorrowAmount > 0.0: "Additional borrow amount must be greater than 0"
+            }
+            
+            let position = TimeLendingProtocol2.borrowingPositions[positionId]!
+            
+            // Get current ETH price
+            let ethPrice = TimeLendingProtocol2.cachedPrices["ETH"] ?? 2000.0
+            
+            // Calculate current collateral value in USD
+            let collateralValueUSD = position.collateralAmount * ethPrice
+            
+            // Calculate max total borrow amount based on LTV
+            let maxTotalBorrowAmount = collateralValueUSD * position.calculatedLTV
+            
+            // Calculate new total borrow amount
+            let newTotalBorrowAmount = position.borrowAmount + additionalBorrowAmount
+            
+            // Check if new borrow amount exceeds LTV limit
+            if newTotalBorrowAmount > maxTotalBorrowAmount {
+                panic("Cannot borrow more. New total would exceed LTV limit. Max allowed: "
+                    .concat(maxTotalBorrowAmount.toString())
+                    .concat(", Requested total: ")
+                    .concat(newTotalBorrowAmount.toString()))
+            }
+            
+            // Withdraw additional borrowed tokens from lending vault
+            if let vaultRef = &TimeLendingProtocol2.lendingVaults[position.borrowTokenType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}? {
+                let borrowedTokens <- vaultRef.withdraw(amount: additionalBorrowAmount)
+                borrowedTokensRecipient.deposit(from: <-borrowedTokens)
+            } else {
+                panic("Lending vault for borrowed token type does not exist")
+            }
+            
+            // Update position with new borrow amount
+            TimeLendingProtocol2.borrowingPositions[positionId]!.updateAmounts(
+                newCollateral: position.collateralAmount,
+                newBorrow: newTotalBorrowAmount
+            )
+            
+            // Recalculate and update health factor
+            let newHealthFactor = TimeLendingProtocol2.calculateHealthFactor(positionId: positionId)
+            TimeLendingProtocol2.borrowingPositions[positionId]!.updateHealthFactor(newHealthFactor: newHealthFactor)
+            
+            emit HealthFactorUpdated(
+                positionId: positionId,
+                oldHealthFactor: position.healthFactor,
+                newHealthFactor: newHealthFactor
+            )
+        }
         
         access(all) fun repayLoan(
             positionId: UInt64,

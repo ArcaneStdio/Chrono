@@ -110,7 +110,7 @@
 		},
 		"testnet": {
 			"testnet": [
-				"WrappedETH1"
+				"TimeLendingProtocol2"
 			]
 		}
 	}
