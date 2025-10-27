@@ -14,6 +14,7 @@ access(all) struct VaultInfo {
     access(all) let availableLiquidity: UFix64
     access(all) let utilizationRate: UFix64  // Percentage of vault being borrowed
     access(all) let numberOfActiveBorrowPositions: Int
+    access(all) let numberOfActiveLendingPositions: Int
     access(all) let price: UFix64
     access(all) let lastPriceUpdate: UFix64
     
@@ -24,6 +25,7 @@ access(all) struct VaultInfo {
         availableLiquidity: UFix64,
         utilizationRate: UFix64,
         numberOfActiveBorrowPositions: Int,
+        numberOfActiveLendingPositions: Int,
         price: UFix64,
         lastPriceUpdate: UFix64
     ) {
@@ -33,6 +35,7 @@ access(all) struct VaultInfo {
         self.availableLiquidity = availableLiquidity
         self.utilizationRate = utilizationRate
         self.numberOfActiveBorrowPositions = numberOfActiveBorrowPositions
+        self.numberOfActiveLendingPositions = numberOfActiveLendingPositions
         self.price = price
         self.lastPriceUpdate = lastPriceUpdate
     }
@@ -90,17 +93,18 @@ access(all) fun main(): ProtocolStats {
     var totalTVL: UFix64 = 0.0
     var totalBorrowedUSD: UFix64 = 0.0
     
-    // Get contract account
-    let contractAccount = getAccount(0xe11cab85e85ae137)
-    
-    // Calculate borrowed amounts per token type
+    // Calculate borrowed amounts and deposited amounts per token type
     var borrowedAmounts: {Type: UFix64} = {}
+    var depositedAmounts: {Type: UFix64} = {}
     var activeBorrowCountPerToken: {Type: Int} = {}
+    var activeLendingCountPerToken: {Type: Int} = {}
     
     // Initialize counters
     for tokenType in tokenTypes {
         borrowedAmounts[tokenType] = 0.0
+        depositedAmounts[tokenType] = 0.0
         activeBorrowCountPerToken[tokenType] = 0
+        activeLendingCountPerToken[tokenType] = 0
     }
     
     // Iterate through all borrowing positions to calculate total borrowed
@@ -124,7 +128,7 @@ access(all) fun main(): ProtocolStats {
         positionId = positionId + 1
     }
     
-    // Count active lending positions
+    // Iterate through all lending positions to calculate total deposited
     var activeLendingPositions = 0
     var lendingPositionId: UInt64 = 1
     
@@ -132,6 +136,14 @@ access(all) fun main(): ProtocolStats {
         if let position = TimeLendingProtocol2.getLendingPosition(id: lendingPositionId) {
             if position.isActive {
                 activeLendingPositions = activeLendingPositions + 1
+                
+                // Add to deposited amount for this token type
+                let currentDeposited = depositedAmounts[position.tokenType] ?? 0.0
+                depositedAmounts[position.tokenType] = currentDeposited + position.amount
+                
+                // Increment active lending count
+                let currentCount = activeLendingCountPerToken[position.tokenType] ?? 0
+                activeLendingCountPerToken[position.tokenType] = currentCount + 1
             }
         }
         lendingPositionId = lendingPositionId + 1
@@ -142,28 +154,14 @@ access(all) fun main(): ProtocolStats {
         let tokenName = tokenNames[tokenType] ?? "Unknown"
         let symbol = tokenSymbols[tokenType] ?? "UNKNOWN"
         
-        // Get vault balance (available liquidity)
-        var availableLiquidity: UFix64 = 0.0
-        
-        // Try to get the lending vault balance
-        let storagePath = StoragePath(identifier: "TimeLendingVault_".concat(tokenType.identifier))
-        if storagePath != nil {
-            if let vault = contractAccount.storage.borrow<&{FungibleToken.Vault}>(from: storagePath!) {
-                availableLiquidity = vault.balance
-            }
-        }
-        
-        // If we couldn't get it from calculated path, try standard protocol paths
-        if availableLiquidity == 0.0 {
-            // The contract stores vaults in a dictionary, so we need to calculate from positions
-            // Available liquidity needs to be read from the actual vault if accessible
-        }
+        // Get deposited amount from lending positions
+        let totalDeposited = depositedAmounts[tokenType] ?? 0.0
         
         // Get borrowed amount for this token
         let totalBorrowed = borrowedAmounts[tokenType] ?? 0.0
         
-        // Calculate total deposited (available + borrowed)
-        let totalDeposited = availableLiquidity + totalBorrowed
+        // Calculate available liquidity (deposited - borrowed)
+        let availableLiquidity = totalDeposited - totalBorrowed
         
         // Calculate utilization rate
         var utilizationRate: UFix64 = 0.0
@@ -175,8 +173,9 @@ access(all) fun main(): ProtocolStats {
         let price = TimeLendingProtocol2.getCachedPrice(symbol: symbol) ?? 1.0
         let lastUpdate = TimeLendingProtocol2.getLastPriceUpdate(symbol: symbol) ?? 0.0
         
-        // Get active borrow count for this token
+        // Get active counts for this token
         let activeBorrowCount = activeBorrowCountPerToken[tokenType] ?? 0
+        let activeLendingCount = activeLendingCountPerToken[tokenType] ?? 0
         
         // Calculate TVL contribution (in USD)
         totalTVL = totalTVL + (totalDeposited * price)
@@ -190,6 +189,7 @@ access(all) fun main(): ProtocolStats {
             availableLiquidity: availableLiquidity,
             utilizationRate: utilizationRate,
             numberOfActiveBorrowPositions: activeBorrowCount,
+            numberOfActiveLendingPositions: activeLendingCount,
             price: price,
             lastPriceUpdate: lastUpdate
         )
