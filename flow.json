@@ -99,6 +99,13 @@
 				"type": "file",
 				"location": "weth.pkey"
 			}
+		},
+		"testnet2": {
+			"address": "904a8cd375b62ddc",
+			"key": {
+				"type": "file",
+				"location": "testnet2.pkey"
+			}
 		}
 	},
 	"deployments": {
