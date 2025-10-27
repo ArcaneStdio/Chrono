@@ -13,20 +13,17 @@ transaction(positionId: UInt64) {
     let collateralRecipient: &{FungibleToken.Receiver}
     let position: TimeLendingProtocol2.BorrowingPosition
     let totalRepayment: UFix64
+    let borrowerAuth: auth(Storage) &Account
     
     prepare(signer: auth(BorrowValue, Storage, Capabilities) &Account) {
         // Get the borrowing position to check details
         self.position = TimeLendingProtocol2.getBorrowingPosition(id: positionId)
             ?? panic("Position does not exist")
         
-        // Verify the signer is the borrower
-        if self.position.borrower != signer.address {
-            panic("Only the borrower can repay this loan")
-        }
-        
         if !self.position.isActive {
             panic("Position is not active")
         }
+        self.borrowerAuth = signer
         
         // Get reference to the borrowing manager
         self.borrowingManagerRef = TimeLendingProtocol2.borrowBorrowingManager()
@@ -70,7 +67,8 @@ transaction(positionId: UInt64) {
         self.borrowingManagerRef.repayLoan(
             positionId: positionId,
             repaymentVault: <- self.repaymentVault,
-            collateralRecipient: self.collateralRecipient
+            collateralRecipient: self.collateralRecipient,
+            borrowerAuth: self.borrowerAuth
         )
         
         log("✅ Loan successfully repaid!")
