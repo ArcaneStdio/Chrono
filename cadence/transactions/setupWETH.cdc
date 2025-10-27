@@ -8,7 +8,7 @@ transaction() {
         if signer.storage.borrow<&WrappedETH.Vault>(from: WrappedETH.VaultStoragePath) != nil {
             return
         }
-        
+            
         // Create a new empty vault
         let vault <- WrappedETH.createEmptyVault(vaultType: Type<@WrappedETH.Vault>())
         
