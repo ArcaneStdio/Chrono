@@ -538,7 +538,7 @@ access(all) contract TimeLendingProtocol2 {
     }
     
     // Borrowing Manager resource
-    access(all) resource BorrowingManager {
+access(all) resource BorrowingManager {
     
     access(all) fun createBorrowingPosition(
         collateralVault: @{FungibleToken.Vault},
@@ -548,118 +548,113 @@ access(all) contract TimeLendingProtocol2 {
         borrower: Address,
         borrowerRecipient: &{FungibleToken.Receiver},  // Recipient for borrowed tokens
         oraclePayment: @{FungibleToken.Vault}  // Payment for oracle price update
-    ): UInt64? 
-    {
+    ): UInt64? {
         // CRITICAL CHECK: Verify lending vault exists and has enough tokens
         if TimeLendingProtocol2.lendingVaults[borrowTokenType] == nil {
             destroy collateralVault
             destroy oraclePayment
             panic("Lending vault does not exist for requested borrow token type")
-        }else {
-            
-            let lendingVaultRef = (&TimeLendingProtocol2.lendingVaults[borrowTokenType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}?)!
-            let availableLiquidity = lendingVaultRef.balance
-            
-            if borrowAmount > availableLiquidity {
-                destroy collateralVault
-                destroy oraclePayment
-                panic("Insufficient liquidity in lending vault. Available: ".concat(availableLiquidity.toString()).concat(", Requested: ").concat(borrowAmount.toString()))
-            }else {
-                
-                let positionId = TimeLendingProtocol2.nextBorrowingPositionId
-                TimeLendingProtocol2.nextBorrowingPositionId = positionId + 1
-                
-                let collateralType = collateralVault.getType()
-                let collateralAmount = collateralVault.balance
-                
-                // Get token symbols
-                let collateralSymbol = TimeLendingProtocol2.getTokenSymbol(tokenType: collateralType)
-                let borrowSymbol = TimeLendingProtocol2.getTokenSymbol(tokenType: borrowTokenType)
-                
-                // Update collateral price from Oracle (if not a stablecoin)
-                if collateralSymbol != "USDC" && collateralSymbol != "USDT" {
-                    let priceStr = Oracle.getPrice(symbol: collateralSymbol, payment: <- oraclePayment)
-                    let collateralPrice = UFix64.fromString(priceStr) ?? 1.0
-                    TimeLendingProtocol2.cachedPrices[collateralSymbol] = collateralPrice
-                    TimeLendingProtocol2.lastPriceUpdate[collateralSymbol] = getCurrentBlock().timestamp
-                    
-                    emit PriceCacheUpdated(
-                        symbol: collateralSymbol, 
-                        price: collateralPrice, 
-                        timestamp: getCurrentBlock().timestamp
-                    )
-                } else {
-                    // Destroy oracle payment if not needed
-                    destroy oraclePayment
-                }
-                
-                // Get current prices
-                let collateralPrice = TimeLendingProtocol2.cachedPrices[collateralSymbol] ?? 1.0
-                let borrowPrice = TimeLendingProtocol2.cachedPrices[borrowSymbol] ?? 1.0
-                
-                // Calculate dynamic LTV and LT
-                let calculatedLTV = TimeLendingProtocol2.calculateDynamicLTV(durationInMinutes: durationMinutes)
-                let liquidationThreshold = TimeLendingProtocol2.calculateDynamicLT(durationInMinutes: durationMinutes)
-                
-                // Calculate max borrow amount in USD
-                let collateralValueUSD = collateralAmount * collateralPrice
-                let maxBorrowAmount = collateralValueUSD * calculatedLTV
-                
-                // Convert borrow amount to USD for comparison
-                let borrowAmountUSD = borrowAmount * borrowPrice
-                
-                if borrowAmountUSD > maxBorrowAmount {
-                    destroy collateralVault
-                    return nil
-                }else {
-                    // Store collateral
-                    if TimeLendingProtocol2.collateralVaults[collateralType] != nil {
-                        let vaultRef = (&TimeLendingProtocol2.collateralVaults[collateralType] as &{FungibleToken.Vault}?)!
-                        vaultRef.deposit(from: <-collateralVault)
-                    } else {
-                        TimeLendingProtocol2.collateralVaults[collateralType] <-! collateralVault
-                    }
-                    
-                }
-                
-                
-                // Withdraw borrowed tokens from lending vault and transfer to borrower
-                let borrowedTokens <- lendingVaultRef.withdraw(amount: borrowAmount)
-                borrowerRecipient.deposit(from: <-borrowedTokens)
-                
-                // Calculate initial health factor
-                let initialHealthFactor = (collateralValueUSD * liquidationThreshold) / borrowAmountUSD
-                
-                // Create borrowing position
-                let position = BorrowingPosition(
-                    id: positionId,
-                    borrower: borrower,
-                    collateralType: collateralType,
-                    collateralAmount: collateralAmount,
-                    borrowTokenType: borrowTokenType,
-                    borrowAmount: borrowAmount,
-                    durationMinutes: durationMinutes,
-                    calculatedLTV: calculatedLTV,
-                    liquidationThreshold: liquidationThreshold,
-                    healthFactor: initialHealthFactor
-                )
-                
-                TimeLendingProtocol2.borrowingPositions[positionId] = position
-                
-                emit BorrowingPositionCreated(
-                    borrower: borrower,
-                    collateralAmount: collateralAmount,
-                    borrowAmount: borrowAmount,
-                    positionId: positionId,
-                    durationMinutes: durationMinutes,
-                    calculatedLTV: calculatedLTV,
-                    liquidationThreshold: liquidationThreshold,
-                    healthFactor: initialHealthFactor
-                )
-                
-                return positionId
-            }
         }
+        
+        let lendingVaultRef = (&TimeLendingProtocol2.lendingVaults[borrowTokenType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}?)!
+        let availableLiquidity = lendingVaultRef.balance
+        
+        if borrowAmount > availableLiquidity {
+            destroy collateralVault
+            destroy oraclePayment
+            panic("Insufficient liquidity in lending vault. Available: ".concat(availableLiquidity.toString()).concat(", Requested: ").concat(borrowAmount.toString()))
+        }
+        
+        let positionId = TimeLendingProtocol2.nextBorrowingPositionId
+        TimeLendingProtocol2.nextBorrowingPositionId = positionId + 1
+        
+        let collateralType = collateralVault.getType()
+        let collateralAmount = collateralVault.balance
+        
+        // Get token symbols
+        let collateralSymbol = TimeLendingProtocol2.getTokenSymbol(tokenType: collateralType)
+        let borrowSymbol = TimeLendingProtocol2.getTokenSymbol(tokenType: borrowTokenType)
+        
+        // Update collateral price from Oracle (if not a stablecoin)
+        if collateralSymbol != "USDC" && collateralSymbol != "USDT" {
+            let priceStr = Oracle.getPrice(symbol: collateralSymbol, payment: <- oraclePayment)
+            let collateralPrice = UFix64.fromString(priceStr) ?? 1.0
+            TimeLendingProtocol2.cachedPrices[collateralSymbol] = collateralPrice
+            TimeLendingProtocol2.lastPriceUpdate[collateralSymbol] = getCurrentBlock().timestamp
+            
+            emit PriceCacheUpdated(
+                symbol: collateralSymbol, 
+                price: collateralPrice, 
+                timestamp: getCurrentBlock().timestamp
+            )
+        } else {
+            // Destroy oracle payment if not needed
+            destroy oraclePayment
+        }
+        
+        // Get current prices
+        let collateralPrice = TimeLendingProtocol2.cachedPrices[collateralSymbol] ?? 1.0
+        let borrowPrice = TimeLendingProtocol2.cachedPrices[borrowSymbol] ?? 1.0
+        
+        // Calculate dynamic LTV and LT
+        let calculatedLTV = TimeLendingProtocol2.calculateDynamicLTV(durationInMinutes: durationMinutes)
+        let liquidationThreshold = TimeLendingProtocol2.calculateDynamicLT(durationInMinutes: durationMinutes)
+        
+        // Calculate max borrow amount in USD
+        let collateralValueUSD = collateralAmount * collateralPrice
+        let maxBorrowAmount = collateralValueUSD * calculatedLTV
+        
+        // Convert borrow amount to USD for comparison
+        let borrowAmountUSD = borrowAmount * borrowPrice
+        
+        if borrowAmountUSD > maxBorrowAmount {
+            destroy collateralVault
+            return nil
+        }
+        
+        // Store collateral
+        if TimeLendingProtocol2.collateralVaults[collateralType] != nil {
+            let vaultRef = (&TimeLendingProtocol2.collateralVaults[collateralType] as &{FungibleToken.Vault}?)!
+            vaultRef.deposit(from: <-collateralVault)
+        } else {
+            TimeLendingProtocol2.collateralVaults[collateralType] <-! collateralVault
+        }
+        
+        // Withdraw borrowed tokens from lending vault and transfer to borrower
+        let borrowedTokens <- lendingVaultRef.withdraw(amount: borrowAmount)
+        borrowerRecipient.deposit(from: <-borrowedTokens)
+        
+        // Calculate initial health factor
+        let initialHealthFactor = (collateralValueUSD * liquidationThreshold) / borrowAmountUSD
+        
+        // Create borrowing position
+        let position = BorrowingPosition(
+            id: positionId,
+            borrower: borrower,
+            collateralType: collateralType,
+            collateralAmount: collateralAmount,
+            borrowTokenType: borrowTokenType,
+            borrowAmount: borrowAmount,
+            durationMinutes: durationMinutes,
+            calculatedLTV: calculatedLTV,
+            liquidationThreshold: liquidationThreshold,
+            healthFactor: initialHealthFactor
+        )
+        
+        TimeLendingProtocol2.borrowingPositions[positionId] = position
+        
+        emit BorrowingPositionCreated(
+            borrower: borrower,
+            collateralAmount: collateralAmount,
+            borrowAmount: borrowAmount,
+            positionId: positionId,
+            durationMinutes: durationMinutes,
+            calculatedLTV: calculatedLTV,
+            liquidationThreshold: liquidationThreshold,
+            healthFactor: initialHealthFactor
+        )
+        
+        return positionId
     }
 
     access(all) fun borrowMore(
@@ -683,79 +678,79 @@ access(all) contract TimeLendingProtocol2 {
             if additionalBorrowAmount > availableLiquidity {
                 destroy oraclePayment
                 panic("Insufficient liquidity in lending vault. Available: ".concat(availableLiquidity.toString()).concat(", Requested: ").concat(additionalBorrowAmount.toString()))
-            }else {
-                // Get token symbols
-                let collateralSymbol = TimeLendingProtocol2.getTokenSymbol(tokenType: position.collateralType)
-                let borrowSymbol = TimeLendingProtocol2.getTokenSymbol(tokenType: position.borrowTokenType)
-                
-                // Update collateral price from Oracle (if not a stablecoin)
-                if collateralSymbol != "USDC" && collateralSymbol != "USDT" {
-                    let priceStr = Oracle.getPrice(symbol: collateralSymbol, payment: <- oraclePayment)
-                    let collateralPrice = UFix64.fromString(priceStr) ?? 1.0
-                    TimeLendingProtocol2.cachedPrices[collateralSymbol] = collateralPrice
-                    TimeLendingProtocol2.lastPriceUpdate[collateralSymbol] = getCurrentBlock().timestamp
-                    
-                    emit PriceCacheUpdated(
-                        symbol: collateralSymbol, 
-                        price: collateralPrice, 
-                        timestamp: getCurrentBlock().timestamp
-                    )
-                } else {
-                    destroy oraclePayment
-                }
-                
-                // Get current prices
-                let collateralPrice = TimeLendingProtocol2.cachedPrices[collateralSymbol] ?? 1.0
-                let borrowPrice = TimeLendingProtocol2.cachedPrices[borrowSymbol] ?? 1.0
-                
-                // Calculate current collateral value in USD
-                let collateralValueUSD = position.collateralAmount * collateralPrice
-                
-                // Calculate max total borrow amount based on LTV (in USD)
-                let maxTotalBorrowAmountUSD = collateralValueUSD * position.calculatedLTV
-                
-                // Calculate new total borrow amount in USD
-                let currentBorrowAmountUSD = position.borrowAmount * borrowPrice
-                let additionalBorrowAmountUSD = additionalBorrowAmount * borrowPrice
-                let newTotalBorrowAmountUSD = currentBorrowAmountUSD + additionalBorrowAmountUSD
-                
-                // Check if new borrow amount exceeds LTV limit
-                if newTotalBorrowAmountUSD > maxTotalBorrowAmountUSD {
-                    panic("Cannot borrow more. New total would exceed LTV limit. Max allowed (USD): "
-                        .concat(maxTotalBorrowAmountUSD.toString())
-                        .concat(", Requested total (USD): ")
-                        .concat(newTotalBorrowAmountUSD.toString()))
-                }
-                
-                // Withdraw additional borrowed tokens from lending vault
-                if let vaultRef = &TimeLendingProtocol2.lendingVaults[position.borrowTokenType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}? {
-                    let borrowedTokens <- vaultRef.withdraw(amount: additionalBorrowAmount)
-                    borrowedTokensRecipient.deposit(from: <-borrowedTokens)
-                } else {
-                    panic("Lending vault for borrowed token type does not exist")
-                }
-                
-                // Update position with new borrow amount
-                let newTotalBorrowAmount = position.borrowAmount + additionalBorrowAmount
-                TimeLendingProtocol2.borrowingPositions[positionId]!.updateAmounts(
-                    newCollateral: position.collateralAmount,
-                    newBorrow: newTotalBorrowAmount
-                )
-                
-                // Recalculate and update health factor
-                let newHealthFactor = TimeLendingProtocol2.calculateHealthFactor(positionId: positionId)
-                TimeLendingProtocol2.borrowingPositions[positionId]!.updateHealthFactor(newHealthFactor: newHealthFactor)
-                
-                emit HealthFactorUpdated(
-                    positionId: positionId,
-                    oldHealthFactor: position.healthFactor,
-                    newHealthFactor: newHealthFactor
-                )
             }
         } else {
             destroy oraclePayment
             panic("Lending vault for borrowed token type does not exist")
         }
+        
+        // Get token symbols
+        let collateralSymbol = TimeLendingProtocol2.getTokenSymbol(tokenType: position.collateralType)
+        let borrowSymbol = TimeLendingProtocol2.getTokenSymbol(tokenType: position.borrowTokenType)
+        
+        // Update collateral price from Oracle (if not a stablecoin)
+        if collateralSymbol != "USDC" && collateralSymbol != "USDT" {
+            let priceStr = Oracle.getPrice(symbol: collateralSymbol, payment: <- oraclePayment)
+            let collateralPrice = UFix64.fromString(priceStr) ?? 1.0
+            TimeLendingProtocol2.cachedPrices[collateralSymbol] = collateralPrice
+            TimeLendingProtocol2.lastPriceUpdate[collateralSymbol] = getCurrentBlock().timestamp
+            
+            emit PriceCacheUpdated(
+                symbol: collateralSymbol, 
+                price: collateralPrice, 
+                timestamp: getCurrentBlock().timestamp
+            )
+        } else {
+            destroy oraclePayment
+        }
+        
+        // Get current prices
+        let collateralPrice = TimeLendingProtocol2.cachedPrices[collateralSymbol] ?? 1.0
+        let borrowPrice = TimeLendingProtocol2.cachedPrices[borrowSymbol] ?? 1.0
+        
+        // Calculate current collateral value in USD
+        let collateralValueUSD = position.collateralAmount * collateralPrice
+        
+        // Calculate max total borrow amount based on LTV (in USD)
+        let maxTotalBorrowAmountUSD = collateralValueUSD * position.calculatedLTV
+        
+        // Calculate new total borrow amount in USD
+        let currentBorrowAmountUSD = position.borrowAmount * borrowPrice
+        let additionalBorrowAmountUSD = additionalBorrowAmount * borrowPrice
+        let newTotalBorrowAmountUSD = currentBorrowAmountUSD + additionalBorrowAmountUSD
+        
+        // Check if new borrow amount exceeds LTV limit
+        if newTotalBorrowAmountUSD > maxTotalBorrowAmountUSD {
+            panic("Cannot borrow more. New total would exceed LTV limit. Max allowed (USD): "
+                .concat(maxTotalBorrowAmountUSD.toString())
+                .concat(", Requested total (USD): ")
+                .concat(newTotalBorrowAmountUSD.toString()))
+        }
+        
+        // Withdraw additional borrowed tokens from lending vault
+        if let vaultRef = &TimeLendingProtocol2.lendingVaults[position.borrowTokenType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}? {
+            let borrowedTokens <- vaultRef.withdraw(amount: additionalBorrowAmount)
+            borrowedTokensRecipient.deposit(from: <-borrowedTokens)
+        } else {
+            panic("Lending vault for borrowed token type does not exist")
+        }
+        
+        // Update position with new borrow amount
+        let newTotalBorrowAmount = position.borrowAmount + additionalBorrowAmount
+        TimeLendingProtocol2.borrowingPositions[positionId]!.updateAmounts(
+            newCollateral: position.collateralAmount,
+            newBorrow: newTotalBorrowAmount
+        )
+        
+        // Recalculate and update health factor
+        let newHealthFactor = TimeLendingProtocol2.calculateHealthFactor(positionId: positionId)
+        TimeLendingProtocol2.borrowingPositions[positionId]!.updateHealthFactor(newHealthFactor: newHealthFactor)
+        
+        emit HealthFactorUpdated(
+            positionId: positionId,
+            oldHealthFactor: position.healthFactor,
+            newHealthFactor: newHealthFactor
+        )
     }
     
     access(all) fun repayLoan(
@@ -780,35 +775,33 @@ access(all) contract TimeLendingProtocol2 {
             let repaymentBalance = repaymentVault.balance
             destroy repaymentVault
             panic("Insufficient repayment amount. Required: ".concat(totalRepayment.toString()).concat(", Provided: ").concat(repaymentBalance.toString()))
-        }else {
-            
-            // Deposit repayment
-            if TimeLendingProtocol2.lendingVaults[position.borrowTokenType] != nil {
-                let vaultRef = (&TimeLendingProtocol2.lendingVaults[position.borrowTokenType] as &{FungibleToken.Vault}?)!
-                
-                if repaymentVault.balance > totalRepayment {
-                    let exactRepayment <- repaymentVault.withdraw(amount: totalRepayment)
-                    vaultRef.deposit(from: <-exactRepayment)
-                    destroy repaymentVault
-                } else {
-                    vaultRef.deposit(from: <-repaymentVault)
-                }
-            } else {
-                TimeLendingProtocol2.lendingVaults[position.borrowTokenType] <-! repaymentVault
-            }
-            
-            // Return collateral
-            if let collateralVaultRef = &TimeLendingProtocol2.collateralVaults[position.collateralType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}? {
-                let collateral <- collateralVaultRef.withdraw(amount: position.collateralAmount)
-                collateralRecipient.deposit(from: <-collateral)
-            }
-            
-            // Close position
-            TimeLendingProtocol2.borrowingPositions[positionId]!.close()
-            
-            emit PositionRepaid(positionId: positionId, borrower: position.borrower, totalRepayment: totalRepayment)
         }
         
+        // Deposit repayment
+        if TimeLendingProtocol2.lendingVaults[position.borrowTokenType] != nil {
+            let vaultRef = (&TimeLendingProtocol2.lendingVaults[position.borrowTokenType] as &{FungibleToken.Vault}?)!
+            
+            if repaymentVault.balance > totalRepayment {
+                let exactRepayment <- repaymentVault.withdraw(amount: totalRepayment)
+                vaultRef.deposit(from: <-exactRepayment)
+                destroy repaymentVault
+            } else {
+                vaultRef.deposit(from: <-repaymentVault)
+            }
+        } else {
+            TimeLendingProtocol2.lendingVaults[position.borrowTokenType] <-! repaymentVault
+        }
+        
+        // Return collateral
+        if let collateralVaultRef = &TimeLendingProtocol2.collateralVaults[position.collateralType] as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}? {
+            let collateral <- collateralVaultRef.withdraw(amount: position.collateralAmount)
+            collateralRecipient.deposit(from: <-collateral)
+        }
+        
+        // Close position
+        TimeLendingProtocol2.borrowingPositions[positionId]!.close()
+        
+        emit PositionRepaid(positionId: positionId, borrower: position.borrower, totalRepayment: totalRepayment)
     }
 }
     

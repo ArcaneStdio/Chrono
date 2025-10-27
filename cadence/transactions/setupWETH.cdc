@@ -1,5 +1,5 @@
 import FungibleToken from 0x9a0766d93b6608b7
-import WrappedETH from 0x695362a431cd594b
+import WrappedETH2 from 0xe11cab85e85ae137
 
 transaction() {
     
