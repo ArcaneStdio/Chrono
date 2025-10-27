@@ -161,7 +161,7 @@ access(all) contract TimeLendingProtocol2 {
             if positiveExponent > 63 {
                 powerOfTwo = 0.0
             } else {
-                let denominator = UFix64(UInt64(1) << positiveExponent)
+                let denominator = UFix64(1 as UInt64 << positiveExponent)
                 powerOfTwo = 1.0 / denominator
             }
         }
