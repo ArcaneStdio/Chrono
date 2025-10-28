@@ -87,34 +87,34 @@ export default function BorrowView() {
   return (
     <div className="space-y-6">
       <motion.div 
-        className="flex items-start justify-between"
+        className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 md:gap-6"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <div className="flex items-start gap-4">
-          <div className="w-16 h-16 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center mt-1">
-            <svg className="w-8 h-8 text-[#c5ff4a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="flex items-start gap-3 md:gap-4">
+          <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center mt-1 flex-shrink-0">
+            <svg className="w-6 h-6 md:w-8 md:h-8 text-[#c5ff4a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
             </svg>
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Borrow</h1>
-            <p className="text-gray-400 text-sm">Borrow assets using your collateral with dynamic LTV.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-1 md:mb-2">Borrow</h1>
+            <p className="text-gray-400 text-xs md:text-sm">Borrow assets using your collateral with dynamic LTV.</p>
           </div>
         </div>
 
         <motion.div 
-          className="bg-neutral-800/50 border border-neutral-700 rounded-xl p-4 max-w-md"
+          className="bg-neutral-800/50 border border-neutral-700 rounded-xl p-4 md:max-w-md"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: 0.2 }}
         >
           <div className="flex items-start gap-2">
-            <InfoIcon className="w-5 h-5 text-[#c5ff4a] mt-0.5" />
+            <InfoIcon className="w-5 h-5 text-[#c5ff4a] mt-0.5 flex-shrink-0" />
             <div>
-              <h3 className="text-white font-semibold mb-1">Time-Based LTV</h3>
-              <p className="text-gray-400 text-sm">
+              <h3 className="text-white font-semibold mb-1 text-sm md:text-base">Time-Based LTV</h3>
+              <p className="text-gray-400 text-xs md:text-sm">
                 Chrono uses dynamic LTV that adjusts based on your loan duration. 
                 Shorter loans get higher LTV ratios.
               </p>
@@ -147,11 +147,12 @@ export default function BorrowView() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.4 }}
       >
-        <div className="p-6 border-b border-neutral-700">
-          <h2 className="text-xl font-bold text-white">Available to Borrow</h2>
+        <div className="p-4 md:p-6 border-b border-neutral-700">
+          <h2 className="text-lg md:text-xl font-bold text-white">Available to Borrow</h2>
         </div>
         
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[700px]">
           <thead>
             <tr className="border-b border-neutral-700">
               <th className="text-left p-4 text-gray-400 font-medium text-sm">Asset</th>
@@ -219,6 +220,7 @@ export default function BorrowView() {
             )))}
           </tbody>
         </table>
+        </div>
       </motion.div>
     </div>
   )

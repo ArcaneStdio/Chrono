@@ -62,7 +62,7 @@ export default function BorrowPositionView({ asset, onBack }) {
 
   return (
     <motion.div 
-      className="min-h-screen bg-neutral-950 pt-8"
+      className="min-h-screen bg-neutral-950 pt-4 md:pt-8"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -71,7 +71,7 @@ export default function BorrowPositionView({ asset, onBack }) {
       <div className="container mx-auto px-4">
         <motion.button 
           onClick={onBack}
-          className="mb-6 text-gray-400 hover:text-white flex items-center gap-2 transition-colors"
+          className="mb-4 md:mb-6 text-gray-400 hover:text-white flex items-center gap-2 transition-colors"
           whileHover={{ x: -4 }}
           whileTap={{ scale: 0.95 }}
         >
@@ -82,46 +82,46 @@ export default function BorrowPositionView({ asset, onBack }) {
         </motion.button>
 
         <motion.div 
-          className="mb-8"
+          className="mb-6 md:mb-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
         >
           <div className="flex items-center gap-3 mb-4">
-            <div className="flex items-center">
-              <div className="w-12 h-12 rounded-full bg-neutral-800 border-2 border-neutral-950 flex items-center justify-center text-white font-semibold">
+            <div className="flex items-center flex-shrink-0">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-neutral-800 border-2 border-neutral-950 flex items-center justify-center text-white font-semibold text-sm md:text-base">
                 {asset.symbol.substring(0, 2)}
               </div>
-              <div className="w-12 h-12 rounded-full bg-neutral-800 border-2 border-neutral-950 flex items-center justify-center -ml-4 text-white font-semibold">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-neutral-800 border-2 border-neutral-950 flex items-center justify-center -ml-3 md:-ml-4 text-white font-semibold text-sm md:text-base">
                 USD
               </div>
             </div>
             <div>
               <div className="text-xs text-gray-500">Chrono Protocol</div>
-              <h1 className="text-3xl font-bold text-white">{asset.name} / USDC</h1>
+              <h1 className="text-xl md:text-3xl font-bold text-white">{asset.name} / USDC</h1>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-8">
+          <div className="grid grid-cols-3 gap-3 md:gap-8">
             <div>
-              <div className="text-gray-500 text-sm mb-1">Liquidity</div>
-              <div className="text-2xl font-bold text-white">{asset.available}</div>
-              <div className="text-xs text-gray-500">{asset.availableToken}</div>
+              <div className="text-gray-500 text-xs md:text-sm mb-1">Liquidity</div>
+              <div className="text-base md:text-2xl font-bold text-white">{asset.available}</div>
+              <div className="text-xs text-gray-500 hidden md:block">{asset.availableToken}</div>
             </div>
             <div>
-              <div className="text-gray-500 text-sm mb-1">Max multiplier</div>
-              <div className="text-2xl font-bold text-white">16.65 x</div>
+              <div className="text-gray-500 text-xs md:text-sm mb-1">Max multiplier</div>
+              <div className="text-base md:text-2xl font-bold text-white">16.65 x</div>
             </div>
             <div>
-              <div className="text-gray-500 text-sm mb-1">Max ROE</div>
-              <div className="text-2xl font-bold text-[#c5ff4a]">{maxLTV.toFixed(2)} %</div>
+              <div className="text-gray-500 text-xs md:text-sm mb-1">Max ROE</div>
+              <div className="text-base md:text-2xl font-bold text-[#c5ff4a]">{maxLTV.toFixed(2)} %</div>
             </div>
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2 space-y-6">
-            <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <motion.div 
                 className="bg-neutral-900 border border-neutral-800 rounded-xl p-6"
                 initial={{ opacity: 0, y: 20 }}
@@ -195,11 +195,11 @@ export default function BorrowPositionView({ asset, onBack }) {
               </div>
             </div>
 
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 md:p-6">
               {activeTab === 'pair' && (
                 <div>
-                  <h3 className="text-xl font-bold text-white mb-6">Overview</h3>
-                  <div className="grid grid-cols-3 gap-6">
+                  <h3 className="text-lg md:text-xl font-bold text-white mb-4 md:mb-6">Overview</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
                     <div>
                       <div className="text-xs text-gray-500 mb-2">Oracle price</div>
                       <div className="text-lg font-semibold text-white">$1.00</div>
@@ -243,8 +243,8 @@ export default function BorrowPositionView({ asset, onBack }) {
             </div>
           </div>
 
-          <div>
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+          <div className="lg:sticky lg:top-8 h-fit">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 md:p-6">
               <div className="border-b border-neutral-800 mb-6">
                 <button className="pb-3 px-1 text-sm font-medium text-white relative">
                   Borrow
