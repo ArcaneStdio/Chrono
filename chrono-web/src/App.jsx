@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion' // eslint-disable-line no-unused-vars
 import Navbar from './components/Navbar'
 import LendView from './components/LendView'
 import BorrowView from './components/BorrowView'
@@ -56,6 +57,33 @@ function App() {
     }
   }
 
+
+  const pageVariants = {
+    initial: { 
+      opacity: 0, 
+      y: 8,      
+      scale: 0.99  
+    },
+    animate: { 
+      opacity: 1, 
+      y: 0,
+      scale: 1,
+      transition: {
+        duration: 0.25, 
+        ease: [0.4, 0, 0.2, 1]
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      y: -8,    
+      scale: 0.99,
+      transition: {
+        duration: 0.2, 
+        ease: [0.4, 0, 1, 1]
+      }
+    }
+  }
+
   return (
     <div className="min-h-screen bg-neutral-950">
       <Navbar 
@@ -68,9 +96,41 @@ function App() {
       />
       
       <main className="container mx-auto px-4 py-8">
-        {activeView === 'lend' && <LendView />}
-        {activeView === 'borrow' && <BorrowView />}
-        {activeView === 'pools' && <PoolsView />}
+        <AnimatePresence mode="wait">
+          {activeView === 'lend' && (
+            <motion.div
+              key="lend"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <LendView />
+            </motion.div>
+          )}
+          {activeView === 'borrow' && (
+            <motion.div
+              key="borrow"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <BorrowView />
+            </motion.div>
+          )}
+          {activeView === 'pools' && (
+            <motion.div
+              key="pools"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <PoolsView />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
 
       <WalletModal 

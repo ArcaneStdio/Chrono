@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
 import { 
   SearchIcon, 
   GridIcon, 
@@ -8,6 +9,15 @@ import {
 export default function PoolsView() {
   const [activeTab, setActiveTab] = useState('pools')
   const [viewMode, setViewMode] = useState('grid')
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    setIsLoading(true)
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 700)
+    return () => clearTimeout(timer)
+  }, [])
 
   const swapVolume = "444.34M"
   const availableLiquidity = "14.28M"
@@ -49,9 +59,39 @@ export default function PoolsView() {
     }
   ]
 
+  const SkeletonPool = () => (
+    <div className="bg-neutral-800/30 border border-neutral-700 rounded-xl p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center">
+            <div className="w-10 h-10 rounded-full bg-neutral-700 animate-shimmer"></div>
+            <div className="w-10 h-10 rounded-full bg-neutral-700 animate-shimmer -ml-3"></div>
+          </div>
+          <div className="space-y-2">
+            <div className="h-3 w-24 bg-neutral-700 rounded animate-shimmer"></div>
+            <div className="h-5 w-32 bg-neutral-700 rounded animate-shimmer"></div>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-5 gap-6">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="space-y-2">
+            <div className="h-3 w-20 bg-neutral-700 rounded animate-shimmer"></div>
+            <div className="h-5 w-24 bg-neutral-700 rounded animate-shimmer"></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <motion.div 
+        className="flex items-start justify-between"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
         <div className="flex items-start gap-4">
           <div className="w-16 h-16 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center mt-1">
             <svg className="w-8 h-8 text-[#c5ff4a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -67,16 +107,34 @@ export default function PoolsView() {
         </div>
 
         <div className="flex gap-12 mt-2">
-          <div className="text-right">
+          <motion.div 
+            className="text-right"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+          >
             <p className="text-gray-500 text-xs mb-1">7d swap volume</p>
-            <p className="text-2xl font-semibold text-gray-300">$ {swapVolume}</p>
-          </div>
-          <div className="text-right">
+            {isLoading ? (
+              <div className="h-8 w-32 bg-neutral-700 rounded animate-shimmer"></div>
+            ) : (
+              <p className="text-2xl font-semibold text-gray-300">$ {swapVolume}</p>
+            )}
+          </motion.div>
+          <motion.div 
+            className="text-right"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+          >
             <p className="text-gray-500 text-xs mb-1">Available liquidity</p>
-            <p className="text-2xl font-semibold text-gray-300">$ {availableLiquidity}</p>
-          </div>
+            {isLoading ? (
+              <div className="h-8 w-32 bg-neutral-700 rounded animate-shimmer"></div>
+            ) : (
+              <p className="text-2xl font-semibold text-gray-300">$ {availableLiquidity}</p>
+            )}
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
 
       <div className="border-b border-neutral-700">
         <div className="flex gap-8">
@@ -181,10 +239,23 @@ export default function PoolsView() {
       </div>
 
       <div className="space-y-4">
-        {pools.map((pool, index) => (
-          <div 
+        {isLoading ? (
+          <>
+            <SkeletonPool />
+            <SkeletonPool />
+          </>
+        ) : (
+          pools.map((pool, index) => (
+          <motion.div 
             key={index}
             className="bg-neutral-800/30 border border-neutral-700 rounded-xl p-6 hover:border-neutral-600 transition-colors"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ 
+              duration: 0.4, 
+              delay: index * 0.1,
+              ease: [0.4, 0, 0.2, 1]
+            }}
           >
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -260,8 +331,8 @@ export default function PoolsView() {
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          </motion.div>
+        )))}
       </div>
 
       {activeTab === 'incentivised' && (

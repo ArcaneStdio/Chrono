@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
 import IRMGraph from './IRMGraph'
 
 export default function LendPositionView({ asset, onBack }) {
@@ -29,19 +30,32 @@ export default function LendPositionView({ asset, onBack }) {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 pt-8">
+    <motion.div 
+      className="min-h-screen bg-neutral-950 pt-8"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+    >
       <div className="container mx-auto px-4">
-        <button 
+        <motion.button 
           onClick={onBack}
           className="mb-6 text-gray-400 hover:text-white flex items-center gap-2 transition-colors"
+          whileHover={{ x: -4 }}
+          whileTap={{ scale: 0.95 }}
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Back to Lend
-        </button>
+        </motion.button>
 
-        <div className="mb-8">
+        <motion.div 
+          className="mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
           <div className="flex items-center gap-3 mb-4">
             <div className="w-16 h-16 rounded-full bg-neutral-800 border-2 border-neutral-950 flex items-center justify-center text-white font-bold text-xl">
               {asset.symbol.substring(0, 1)}
@@ -70,11 +84,16 @@ export default function LendPositionView({ asset, onBack }) {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         <div className="grid grid-cols-3 gap-6">
           <div className="col-span-2 space-y-6">
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+            <motion.div 
+              className="bg-neutral-900 border border-neutral-800 rounded-xl p-6"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+            >
               <h3 className="text-xl font-bold text-white mb-6">Overview</h3>
               <div className="grid grid-cols-3 gap-6">
                 <div>
@@ -121,9 +140,14 @@ export default function LendPositionView({ asset, onBack }) {
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+            <motion.div 
+              className="bg-neutral-900 border border-neutral-800 rounded-xl p-6"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.3 }}
+            >
               <h3 className="text-xl font-bold text-white mb-6">Statistics</h3>
               <div className="grid grid-cols-3 gap-6">
                 <div>
@@ -154,15 +178,20 @@ export default function LendPositionView({ asset, onBack }) {
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+            <motion.div 
+              className="bg-neutral-900 border border-neutral-800 rounded-xl p-6"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.4 }}
+            >
               <div className="flex items-center gap-2 mb-4">
                 <h3 className="text-xl font-bold text-white">Interest rate model</h3>
                 <span className="px-2 py-0.5 bg-[#c5ff4a] text-neutral-900 text-xs font-semibold rounded">Kink</span>
               </div>
               <IRMGraph currentUtilization={parseFloat(vaultData.utilization)} />
-            </div>
+            </motion.div>
 
             <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
               <h3 className="text-xl font-bold text-white mb-6">Risk parameters</h3>
@@ -373,7 +402,7 @@ export default function LendPositionView({ asset, onBack }) {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 

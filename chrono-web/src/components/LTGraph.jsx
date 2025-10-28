@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
 
 export default function LTGraph({ currentTime }) {
   const svgRef = useRef()
   const [hoverPoint, setHoverPoint] = useState(null)
 
   useEffect(() => {
-    drawGraph()
+    const timer = setTimeout(() => {
+      drawGraph()
+    }, 100)
+    return () => clearTimeout(timer)
     //eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTime])
 
@@ -93,6 +97,12 @@ export default function LTGraph({ currentTime }) {
     path.setAttribute('stroke', '#fb923c')
     path.setAttribute('stroke-width', '2')
     path.setAttribute('fill', 'none')
+    
+    const pathLength = path.getTotalLength()
+    path.style.strokeDasharray = pathLength
+    path.style.strokeDashoffset = pathLength
+    path.style.animation = 'drawPath 1.5s ease-out forwards'
+    
     svg.appendChild(path)
 
     if (currentTime > 0) {
@@ -168,11 +178,18 @@ export default function LTGraph({ currentTime }) {
   }
 
   return (
-    <div className="relative">
+    <motion.div 
+      className="relative"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5 }}
+    >
       <svg ref={svgRef}></svg>
       {hoverPoint && (
-        <div 
+        <motion.div 
           className="absolute bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-xs text-white pointer-events-none z-10"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
           style={{ 
             left: `${(hoverPoint.x / 500) * 100}%`, 
             top: `${(hoverPoint.y / 300) * 100 - 10}%`,
@@ -181,11 +198,11 @@ export default function LTGraph({ currentTime }) {
         >
           <div>Time: {hoverPoint.t} min</div>
           <div className="text-orange-400">LT: {hoverPoint.lt}%</div>
-        </div>
+        </motion.div>
       )}
       <div className="mt-2 text-xs text-gray-500 text-center">
         Formula: LT = 77 + 18 × e^(-0.000333t)
       </div>
-    </div>
+    </motion.div>
   )
 }

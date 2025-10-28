@@ -1,9 +1,20 @@
 import { TrendUpIcon, InfoIcon } from './Icons'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
 import BorrowPositionView from './BorrowPositionView'
 
 export default function BorrowView() {
   const [selectedAsset, setSelectedAsset] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  
+  useEffect(() => {
+    setIsLoading(true)
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [])
+
   const borrowAssets = [
     {
       name: 'FLOW',
@@ -41,9 +52,46 @@ export default function BorrowView() {
     return <BorrowPositionView asset={selectedAsset} onBack={() => setSelectedAsset(null)} />
   }
 
+  const SkeletonRow = () => (
+    <tr className="border-b border-neutral-700/50">
+      <td className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-neutral-700 animate-shimmer"></div>
+          <div className="space-y-2">
+            <div className="h-4 w-24 bg-neutral-700 rounded animate-shimmer"></div>
+            <div className="h-3 w-16 bg-neutral-700 rounded animate-shimmer"></div>
+          </div>
+        </div>
+      </td>
+      <td className="p-4">
+        <div className="h-4 w-20 bg-neutral-700 rounded animate-shimmer"></div>
+      </td>
+      <td className="p-4">
+        <div className="h-5 w-16 bg-neutral-700 rounded animate-shimmer"></div>
+      </td>
+      <td className="p-4">
+        <div className="space-y-2">
+          <div className="h-4 w-24 bg-neutral-700 rounded animate-shimmer"></div>
+          <div className="h-3 w-32 bg-neutral-700 rounded animate-shimmer"></div>
+        </div>
+      </td>
+      <td className="p-4">
+        <div className="h-5 w-16 bg-neutral-700 rounded animate-shimmer"></div>
+      </td>
+      <td className="p-4">
+        <div className="h-5 w-16 bg-neutral-700 rounded animate-shimmer"></div>
+      </td>
+    </tr>
+  )
+
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <motion.div 
+        className="flex items-start justify-between"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
         <div className="flex items-start gap-4">
           <div className="w-16 h-16 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center mt-1">
             <svg className="w-8 h-8 text-[#c5ff4a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -56,7 +104,12 @@ export default function BorrowView() {
           </div>
         </div>
 
-        <div className="bg-neutral-800/50 border border-neutral-700 rounded-xl p-4 max-w-md">
+        <motion.div 
+          className="bg-neutral-800/50 border border-neutral-700 rounded-xl p-4 max-w-md"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+        >
           <div className="flex items-start gap-2">
             <InfoIcon className="w-5 h-5 text-[#c5ff4a] mt-0.5" />
             <div>
@@ -67,10 +120,15 @@ export default function BorrowView() {
               </p>
             </div>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
-      <div className="bg-neutral-800/30 border border-neutral-700 rounded-xl p-6">
+      <motion.div 
+        className="bg-neutral-800/30 border border-neutral-700 rounded-xl p-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.3 }}
+      >
         <h2 className="text-xl font-bold text-white mb-4">Your Active Positions</h2>
         <div className="text-center py-12">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-neutral-800 flex items-center justify-center">
@@ -81,9 +139,14 @@ export default function BorrowView() {
           <p className="text-gray-400">No active borrowing positions</p>
           <p className="text-gray-500 text-sm mt-2">Connect your wallet to view or create positions</p>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="bg-neutral-800/30 border border-neutral-700 rounded-xl overflow-hidden">
+      <motion.div 
+        className="bg-neutral-800/30 border border-neutral-700 rounded-xl overflow-hidden"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.4 }}
+      >
         <div className="p-6 border-b border-neutral-700">
           <h2 className="text-xl font-bold text-white">Available to Borrow</h2>
         </div>
@@ -100,11 +163,25 @@ export default function BorrowView() {
             </tr>
           </thead>
           <tbody>
-            {borrowAssets.map((asset, index) => (
-              <tr 
+            {isLoading ? (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            ) : (
+              borrowAssets.map((asset, index) => (
+              <motion.tr 
                 key={index}
                 onClick={() => setSelectedAsset(asset)}
                 className="border-b border-neutral-700/50 hover:bg-neutral-800/50 transition-colors cursor-pointer"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ 
+                  duration: 0.3, 
+                  delay: index * 0.1,
+                  ease: [0.4, 0, 0.2, 1]
+                }}
               >
                 <td className="p-4">
                   <div className="flex items-center gap-3">
@@ -138,11 +215,11 @@ export default function BorrowView() {
                 <td className="p-4">
                   <span className="text-orange-400 font-medium">{asset.liquidationThreshold}</span>
                 </td>
-              </tr>
-            ))}
+              </motion.tr>
+            )))}
           </tbody>
         </table>
-      </div>
+      </motion.div>
     </div>
   )
 }

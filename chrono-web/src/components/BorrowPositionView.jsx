@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
 import { InfoIcon } from './Icons'
 import LTVGraph from './LTVGraph'
 import LTGraph from './LTGraph'
@@ -60,19 +61,32 @@ export default function BorrowPositionView({ asset, onBack }) {
   }, [totalMinutes])
 
   return (
-    <div className="min-h-screen bg-neutral-950 pt-8">
+    <motion.div 
+      className="min-h-screen bg-neutral-950 pt-8"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+    >
       <div className="container mx-auto px-4">
-        <button 
+        <motion.button 
           onClick={onBack}
           className="mb-6 text-gray-400 hover:text-white flex items-center gap-2 transition-colors"
+          whileHover={{ x: -4 }}
+          whileTap={{ scale: 0.95 }}
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Back to Borrow
-        </button>
+        </motion.button>
 
-        <div className="mb-8">
+        <motion.div 
+          className="mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
           <div className="flex items-center gap-3 mb-4">
             <div className="flex items-center">
               <div className="w-12 h-12 rounded-full bg-neutral-800 border-2 border-neutral-950 flex items-center justify-center text-white font-semibold">
@@ -103,19 +117,29 @@ export default function BorrowPositionView({ asset, onBack }) {
               <div className="text-2xl font-bold text-[#c5ff4a]">{maxLTV.toFixed(2)} %</div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         <div className="grid grid-cols-3 gap-6">
           <div className="col-span-2 space-y-6">
             <div className="grid grid-cols-2 gap-6">
-              <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+              <motion.div 
+                className="bg-neutral-900 border border-neutral-800 rounded-xl p-6"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.2 }}
+              >
                 <h3 className="text-lg font-semibold text-white mb-4">Loan-to-Value (LTV) Over Time</h3>
                 <LTVGraph currentTime={totalMinutes} />
-              </div>
-              <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+              </motion.div>
+              <motion.div 
+                className="bg-neutral-900 border border-neutral-800 rounded-xl p-6"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.25 }}
+              >
                 <h3 className="text-lg font-semibold text-white mb-4">Liquidation Threshold (LT) Over Time</h3>
                 <LTGraph currentTime={totalMinutes} />
-              </div>
+              </motion.div>
             </div>
 
             <div className="border-b border-neutral-800 mb-6">
@@ -385,7 +409,7 @@ export default function BorrowPositionView({ asset, onBack }) {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 

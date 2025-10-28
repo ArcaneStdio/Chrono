@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
 import { SearchIcon, TrendUpIcon, SortIcon } from './Icons'
 import LendPositionView from './LendPositionView'
 
@@ -6,6 +7,7 @@ export default function LendView() {
   const [inWallet, setInWallet] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedAsset, setSelectedAsset] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   const totalBorrow = "1.68B"
   const totalBorrowUSD = "$798.60M on Ethereum"
@@ -109,6 +111,14 @@ export default function LendView() {
     asset.protocol.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  useEffect(() => {
+    setIsLoading(true)
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [])
+
   const getUtilizationColor = (percent) => {
     if (percent === 0) return 'bg-gray-600'
     if (percent < 50) return 'bg-neutral-500'
@@ -120,9 +130,49 @@ export default function LendView() {
     return <LendPositionView asset={selectedAsset} onBack={() => setSelectedAsset(null)} />
   }
 
+  const SkeletonRow = () => (
+    <tr className="border-b border-neutral-700/50">
+      <td className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-neutral-700 animate-shimmer"></div>
+          <div className="space-y-2">
+            <div className="h-4 w-24 bg-neutral-700 rounded animate-shimmer"></div>
+            <div className="h-3 w-16 bg-neutral-700 rounded animate-shimmer"></div>
+          </div>
+        </div>
+      </td>
+      <td className="p-4">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-full bg-neutral-700 animate-shimmer"></div>
+          <div className="h-4 w-20 bg-neutral-700 rounded animate-shimmer"></div>
+        </div>
+      </td>
+      <td className="p-4">
+        <div className="h-5 w-16 bg-neutral-700 rounded animate-shimmer"></div>
+      </td>
+      <td className="p-4">
+        <div className="space-y-2">
+          <div className="h-4 w-24 bg-neutral-700 rounded animate-shimmer"></div>
+          <div className="h-3 w-32 bg-neutral-700 rounded animate-shimmer"></div>
+        </div>
+      </td>
+      <td className="p-4">
+        <div className="h-5 w-16 bg-neutral-700 rounded animate-shimmer"></div>
+      </td>
+      <td className="p-4">
+        <div className="h-5 w-24 bg-neutral-700 rounded animate-shimmer"></div>
+      </td>
+    </tr>
+  )
+
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <motion.div 
+        className="flex items-start justify-between"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
         <div className="flex items-start gap-4">
           <div className="w-16 h-16 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center mt-1">
             <svg className="w-8 h-8 text-[#c5ff4a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -136,18 +186,36 @@ export default function LendView() {
         </div>
 
         <div className="flex gap-8">
-          <div className="text-right">
+          <motion.div 
+            className="text-right"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+          >
             <p className="text-gray-500 text-xs mb-1">Total borrow</p>
-            <p className="text-2xl font-semibold text-gray-300">$ {totalBorrow}</p>
+            {isLoading ? (
+              <div className="h-8 w-32 bg-neutral-700 rounded animate-shimmer mb-1"></div>
+            ) : (
+              <p className="text-2xl font-semibold text-gray-300">$ {totalBorrow}</p>
+            )}
             <p className="text-xs text-gray-500">{totalBorrowUSD}</p>
-          </div>
-          <div className="text-right">
+          </motion.div>
+          <motion.div 
+            className="text-right"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+          >
             <p className="text-gray-500 text-xs mb-1">Total supply</p>
-            <p className="text-2xl font-semibold text-gray-300">$ {totalSupply}</p>
+            {isLoading ? (
+              <div className="h-8 w-32 bg-neutral-700 rounded animate-shimmer mb-1"></div>
+            ) : (
+              <p className="text-2xl font-semibold text-gray-300">$ {totalSupply}</p>
+            )}
             <p className="text-xs text-gray-500">{totalSupplyUSD}</p>
-          </div>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
 
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-xs">
@@ -237,11 +305,26 @@ export default function LendView() {
             </tr>
           </thead>
           <tbody>
-            {filteredAssets.map((asset, index) => (
-              <tr 
+            {isLoading ? (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            ) : (
+              filteredAssets.map((asset, index) => (
+              <motion.tr 
                 key={index}
                 onClick={() => setSelectedAsset(asset)}
                 className="border-b border-neutral-700/50 hover:bg-neutral-800/50 transition-colors cursor-pointer"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ 
+                  duration: 0.3, 
+                  delay: index * 0.05,
+                  ease: [0.4, 0, 0.2, 1]
+                }}
               >
                 <td className="p-4">
                   <div className="flex items-center gap-3">
@@ -302,9 +385,9 @@ export default function LendView() {
                     </span>
                   </div>
                 </td>
-              </tr>
-            ))}
-            {filteredAssets.length === 0 && (
+              </motion.tr>
+            )))}
+            {!isLoading && filteredAssets.length === 0 && (
               <tr>
                 <td colSpan="6" className="p-8 text-center text-gray-500">
                   No assets found matching "{searchQuery}"
