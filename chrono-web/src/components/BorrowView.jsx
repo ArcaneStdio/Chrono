@@ -2,51 +2,37 @@ import { TrendUpIcon, InfoIcon } from './Icons'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
 import BorrowPositionView from './BorrowPositionView'
+import { fetchVaultData, transformForBorrowView } from '../utils/vaultData'
 
 export default function BorrowView() {
   const [selectedAsset, setSelectedAsset] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [vaultData, setVaultData] = useState(null)
+  const [error, setError] = useState(null)
   
   useEffect(() => {
-    setIsLoading(true)
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 600)
-    return () => clearTimeout(timer)
+    async function loadVaultData() {
+      try {
+        setIsLoading(true)
+        const data = await fetchVaultData()
+        setVaultData(data)
+        setError(null)
+      } catch (err) {
+        console.error('Failed to load vault data:', err)
+        setError(err.message)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    loadVaultData()
+    
+    // Refresh data every 5 minutes
+    const interval = setInterval(loadVaultData, 5 * 60 * 1000)
+    return () => clearInterval(interval)
   }, [])
 
-  const borrowAssets = [
-    {
-      name: 'FLOW',
-      symbol: 'FLOW',
-      protocol: 'Flow',
-      borrowAPY: '5.42%',
-      available: '$45.20M',
-      availableToken: '30.50M FLOW',
-      maxLTV: '75%',
-      liquidationThreshold: '85%'
-    },
-    {
-      name: 'Wrapped ETH',
-      symbol: 'WETH',
-      protocol: 'Chrono',
-      borrowAPY: '2.15%',
-      available: '$15.80M',
-      availableToken: '3,750.20 WETH',
-      maxLTV: '70%',
-      liquidationThreshold: '80%'
-    },
-    {
-      name: 'USDC',
-      symbol: 'USDC',
-      protocol: 'Chrono',
-      borrowAPY: '8.25%',
-      available: '$85.40M',
-      availableToken: '85.40M USDC',
-      maxLTV: '80%',
-      liquidationThreshold: '90%'
-    }
-  ]
+  const borrowAssets = vaultData ? transformForBorrowView(vaultData) : []
 
   if (selectedAsset) {
     return <BorrowPositionView asset={selectedAsset} onBack={() => setSelectedAsset(null)} />
@@ -140,6 +126,14 @@ export default function BorrowView() {
           <p className="text-gray-500 text-sm mt-2">Connect your wallet to view or create positions</p>
         </div>
       </motion.div>
+
+      {error && (
+        <div className="bg-red-900/20 border border-red-700 rounded-xl p-4 text-red-400">
+          <p className="font-semibold">Failed to load vault data</p>
+          <p className="text-sm mt-1">{error}</p>
+          <p className="text-xs mt-2">Make sure vault.json is up to date. Run: node update-vault-data.js</p>
+        </div>
+      )}
 
       <motion.div 
         className="bg-neutral-800/30 border border-neutral-700 rounded-xl overflow-hidden"

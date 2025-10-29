@@ -1,0 +1,22 @@
+{
+  "name": "chrono-vault-data-updater",
+  "version": "1.0.0",
+  "description": "Automated vault data updater for Chrono Protocol",
+  "main": "update-vault-data.js",
+  "scripts": {
+    "update-vault": "node update-vault-data.js && cp vault.json chrono-web/public/vault.json",
+    "update-vault-win": "node update-vault-data.js && copy vault.json chrono-web\\public\\vault.json"
+  },
+  "keywords": [
+    "flow",
+    "blockchain",
+    "defi",
+    "chrono"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
+

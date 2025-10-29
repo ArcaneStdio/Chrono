@@ -272,7 +272,7 @@ export default function BorrowPositionView({ asset, onBack }) {
                     <span className="text-sm font-medium text-white">{asset.symbol}</span>
                   </div>
                 </div>
-                <div className="text-xs text-gray-500 mt-1">~ $0.00</div>
+                <div className="text-xs text-gray-500 mt-1"></div>
               </div>
 
               <div className="mb-6">
@@ -295,7 +295,7 @@ export default function BorrowPositionView({ asset, onBack }) {
                     <span className="text-sm font-medium text-white">USDC</span>
                   </div>
                 </div>
-                <div className="text-xs text-gray-500 mt-1">~ $0.00</div>
+                <div className="text-xs text-gray-500 mt-1"></div>
               </div>
 
               <div className="mb-6">

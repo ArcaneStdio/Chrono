@@ -375,7 +375,7 @@ export default function LendPositionView({ asset, onBack }) {
                     className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-4 text-white text-2xl font-bold focus:outline-none focus:border-neutral-600"
                   />
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-400">~ $0.00</span>
+                    <span className="text-sm font-medium text-gray-400"></span>
                   </div>
                 </div>
               </div>

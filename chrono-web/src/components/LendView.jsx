@@ -2,108 +2,46 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
 import { SearchIcon, TrendUpIcon, SortIcon } from './Icons'
 import LendPositionView from './LendPositionView'
+import { fetchVaultData, transformForLendView, getProtocolStats } from '../utils/vaultData'
 
 export default function LendView() {
   const [inWallet, setInWallet] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedAsset, setSelectedAsset] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [vaultData, setVaultData] = useState(null)
+  const [error, setError] = useState(null)
 
-  const totalBorrow = "1.68B"
-  const totalBorrowUSD = "$798.60M on Ethereum"
-  const totalSupply = "3.33B"
-  const totalSupplyUSD = "$1.61B on Ethereum"
-///hardcoded asset details
-  const allAssets = [
-    {
-      name: 'FLOW',
-      symbol: 'FLOW',
-      protocol: 'Flow',
-      supplyAPY: '3.21%',
-      totalSupply: '$125.50M',
-      totalSupplyToken: '85.00M FLOW',
-      exposure: 3,
-      utilization: '65.3%',
-      utilizationPercent: 65.3
-    },
-    {
-      name: 'Wrapped ETH',
-      symbol: 'WETH',
-      protocol: 'Chrono',
-      supplyAPY: '1.23%',
-      totalSupply: '$39.11M',
-      totalSupplyToken: '9,275.48 WETH',
-      exposure: 18,
-      utilization: '62.62%',
-      utilizationPercent: 62.62
-    },
-    {
-      name: 'USDC',
-      symbol: 'USDC',
-      protocol: 'Chrono',
-      supplyAPY: '6.03%',
-      totalSupply: '$111.25M',
-      totalSupplyToken: '111.26M USDC',
-      exposure: 2,
-      utilization: '82.48%',
-      utilizationPercent: 82.48
-    },
-    {
-      name: 'Wrapped USDC',
-      symbol: 'wUSDC',
-      protocol: 'Chrono Yield',
-      supplyAPY: '10.59%',
-      totalSupply: '$39.11M',
-      totalSupplyToken: '40.00M wUSDC',
-      exposure: 0,
-      utilization: '0.00%',
-      utilizationPercent: 0
-    },
-    {
-      name: 'Chrono Stability Token',
-      symbol: 'CST',
-      protocol: 'Chrono Yield',
-      supplyAPY: '7.33%',
-      totalSupply: '$29.70M',
-      totalSupplyToken: '29.70M CST',
-      exposure: 30,
-      utilization: '89.93%',
-      utilizationPercent: 89.93
-    },
-    {
-      name: 'Chrono Stability Token',
-      symbol: 'CST',
-      protocol: 'Chrono Yield',
-      supplyAPY: '7.33%',
-      totalSupply: '$29.70M',
-      totalSupplyToken: '29.70M CST',
-      exposure: 30,
-      utilization: '89.93%',
-      utilizationPercent: 89.93
-    },
-    {
-      name: 'Chrono Stability Token',
-      symbol: 'CST',
-      protocol: 'Chrono Yield',
-      supplyAPY: '7.33%',
-      totalSupply: '$29.70M',
-      totalSupplyToken: '29.70M CST',
-      exposure: 30,
-      utilization: '89.93%',
-      utilizationPercent: 89.93
-    },
-    {
-      name: 'Chrono Stability Token',
-      symbol: 'CST',
-      protocol: 'Chrono Yield',
-      supplyAPY: '7.33%',
-      totalSupply: '$29.70M',
-      totalSupplyToken: '29.70M CST',
-      exposure: 30,
-      utilization: '89.93%',
-      utilizationPercent: 89.93
+  // Fetch vault data on component mount
+  useEffect(() => {
+    async function loadVaultData() {
+      try {
+        setIsLoading(true)
+        const data = await fetchVaultData()
+        setVaultData(data)
+        setError(null)
+      } catch (err) {
+        console.error('Failed to load vault data:', err)
+        setError(err.message)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  ]
+    
+    loadVaultData()
+    
+    // Refresh data every 5 minutes
+    const interval = setInterval(loadVaultData, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const protocolStats = vaultData ? getProtocolStats(vaultData) : null
+  const totalBorrow = protocolStats?.totalBorrowed || "$0"
+  const totalBorrowUSD = "on Flow Testnet"
+  const totalSupply = protocolStats?.totalValueLocked || "$0"
+  const totalSupplyUSD = "on Flow Testnet"
+  // Transform vault data for display
+  const allAssets = vaultData ? transformForLendView(vaultData) : []
 
   const filteredAssets = allAssets.filter(asset => 
     asset.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -111,13 +49,6 @@ export default function LendView() {
     asset.protocol.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  useEffect(() => {
-    setIsLoading(true)
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 800)
-    return () => clearTimeout(timer)
-  }, [])
 
   const getUtilizationColor = (percent) => {
     if (percent === 0) return 'bg-gray-600'
@@ -271,6 +202,14 @@ export default function LendView() {
           
         </button>
       </div>
+
+      {error && (
+        <div className="bg-red-900/20 border border-red-700 rounded-xl p-4 text-red-400">
+          <p className="font-semibold">Failed to load vault data</p>
+          <p className="text-sm mt-1">{error}</p>
+          <p className="text-xs mt-2">Make sure vault.json is up to date. Run: node update-vault-data.js</p>
+        </div>
+      )}
 
       <div className="bg-neutral-800/30 border border-neutral-700 rounded-xl overflow-x-auto">
         <table className="w-full min-w-[800px]">
