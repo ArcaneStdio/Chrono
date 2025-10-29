@@ -24,16 +24,16 @@
 				"testing": "179b6b1cb6755e31"
 			}
 		},
-		"WrappedUSDC": {
-			"source": "cadence/contracts/WrappedUSDC.cdc",
-			"aliases": {
-				"testing": "179b6b1cb6755e31"
-			}
-		},
 		"WrappedETH2": {
 			"source": "cadence/contracts/WrappedETH2.cdc",
 			"aliases": {
 				"testnet": "695362a431cd594b"
+			}
+		},
+		"WrappedUSDC": {
+			"source": "cadence/contracts/WrappedUSDC.cdc",
+			"aliases": {
+				"testing": "179b6b1cb6755e31"
 			}
 		}
 	},
@@ -93,6 +93,13 @@
 				"location": "testnet.pkey"
 			}
 		},
+		"testnet2": {
+			"address": "904a8cd375b62ddc",
+			"key": {
+				"type": "file",
+				"location": "testnet2.pkey"
+			}
+		},
 		"weth": {
 			"address": "695362a431cd594b",
 			"key": {
@@ -110,7 +117,8 @@
 		},
 		"testnet": {
 			"testnet": [
-				"WrappedUSDC"
+				"WrappedUSDC",
+				"TimeLendingProtocol2"
 			]
 		}
 	}
