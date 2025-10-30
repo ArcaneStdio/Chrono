@@ -111,11 +111,13 @@ export function transformForBorrowView(vaultData) {
     .filter(vault => vault.availableLiquidity > 0)
     .map(vault => {
       const borrowAPY = calculateBorrowAPY(vault.utilizationRate);
+      const supplyAPY = calculateSupplyAPY(borrowAPY, vault.utilizationRate);
       return {
         name: vault.name,
         symbol: vault.symbol,
         protocol: 'Chrono',
         borrowAPY,
+        supplyAPY,
         available: formatUSD(vault.availableLiquidityUSD),
         availableToken: formatTokenAmount(vault.availableLiquidity, vault.symbol),
         maxLTV: '75%',
@@ -143,3 +145,4 @@ export function getProtocolStats(vaultData) {
     lastUpdate: vaultData.timestamp
   };
 }
+
