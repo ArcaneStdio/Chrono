@@ -28,7 +28,7 @@ export default function BorrowView() {
     loadVaultData()
     
     // Refresh data every 5 minutes
-    const interval = setInterval(loadVaultData, 5 * 60 * 1000)
+    const interval = setInterval(loadVaultData, 20 * 1000)
     return () => clearInterval(interval)
   }, [])
 

@@ -1,10 +1,25 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
-import { InfoIcon } from './Icons'
-import LTVGraph from './LTVGraph'
-import LTGraph from './LTGraph'
 
-export default function BorrowPositionView({ asset, onBack }) {
+import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
+
+import { InfoIcon } from './Icons' // Assuming relative path is correct
+
+import LTVGraph from './LTVGraph' // Assuming relative path is correct
+
+import LTGraph from './LTGraph' // Assuming relative path is correct
+
+import { createBorrowingPosition } from '../utils/borrow-transaction-eth'
+
+
+export default function BorrowPositionView({
+  asset,
+  onBack,
+  // New Props for Wallet Connection
+  isWalletConnected,
+  onConnect,
+  userAddress
+}) {
+
   const [activeTab, setActiveTab] = useState('pair')
   const [supplyAmount, setSupplyAmount] = useState('')
   const [borrowAmount, setBorrowAmount] = useState('')
@@ -60,8 +75,50 @@ export default function BorrowPositionView({ asset, onBack }) {
     }
   }, [totalMinutes])
 
+
+  // --- New Borrow Transaction Logic ---
+  const handleBorrow = async () => {
+    const collateralAmountFloat = parseFloat(supplyAmount)
+    const borrowAmountFloat = parseFloat(borrowAmount)
+    const duration = totalMinutes
+
+    if (collateralAmountFloat <= 0 || borrowAmountFloat <= 0 || duration <= 0) {
+      console.error('Supply, Borrow amounts, and Duration must be greater than 0 to create a position.')
+      return
+    }
+
+    try {
+      // Arguments must be strings for UFix64 and UInt64 in Cadence transactions
+      const txId = await createBorrowingPosition(
+        collateralAmountFloat.toFixed(8), // Convert to fixed-point string for UFix64
+        borrowAmountFloat.toFixed(8),     // Convert to fixed-point string for UFix64
+        duration.toString()               // Convert to string for UInt64
+      )
+      console.log('Borrowing Transaction Sent. ID:', txId)
+      // Handle success feedback here
+    } catch (error) {
+      console.error('Failed to send Borrowing Transaction:', error)
+      // Handle error feedback here
+    }
+  }
+
+  // Conditional button logic
+  const isReadyForTransaction = parseFloat(supplyAmount) > 0 && parseFloat(borrowAmount) > 0 && totalMinutes > 0
+
+  const buttonText = isWalletConnected
+    ? (isReadyForTransaction ? 'Create Borrow Position' : 'Enter Amounts')
+    : 'Connect Wallet'
+
+  const handleButtonClick = isWalletConnected
+    ? isReadyForTransaction ? handleBorrow : () => { } // Connected but not ready -> do nothing
+    : onConnect
+
+  const buttonDisabled = isWalletConnected && !isReadyForTransaction
+  // --- End New Borrow Transaction Logic ---
+
+
   return (
-    <motion.div 
+    <motion.div
       className="min-h-screen bg-neutral-950 pt-4 md:pt-8"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -69,7 +126,7 @@ export default function BorrowPositionView({ asset, onBack }) {
       transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
     >
       <div className="container mx-auto px-4">
-        <motion.button 
+        <motion.button
           onClick={onBack}
           className="mb-4 md:mb-6 text-gray-400 hover:text-white flex items-center gap-2 transition-colors"
           whileHover={{ x: -4 }}
@@ -81,7 +138,7 @@ export default function BorrowPositionView({ asset, onBack }) {
           Back to Borrow
         </motion.button>
 
-        <motion.div 
+        <motion.div
           className="mb-6 md:mb-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -122,7 +179,7 @@ export default function BorrowPositionView({ asset, onBack }) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-              <motion.div 
+              <motion.div
                 className="bg-neutral-900 border border-neutral-800 rounded-xl p-6"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -131,7 +188,7 @@ export default function BorrowPositionView({ asset, onBack }) {
                 <h3 className="text-lg font-semibold text-white mb-4">Loan-to-Value (LTV) Over Time</h3>
                 <LTVGraph currentTime={totalMinutes} />
               </motion.div>
-              <motion.div 
+              <motion.div
                 className="bg-neutral-900 border border-neutral-800 rounded-xl p-6"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -146,9 +203,8 @@ export default function BorrowPositionView({ asset, onBack }) {
               <div className="flex gap-6">
                 <button
                   onClick={() => setActiveTab('pair')}
-                  className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
-                    activeTab === 'pair' ? 'text-white' : 'text-gray-500 hover:text-gray-300'
-                  }`}
+                  className={`pb-3 px-1 text-sm font-medium transition-colors relative ${activeTab === 'pair' ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+                    }`}
                 >
                   <div className="flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -162,9 +218,8 @@ export default function BorrowPositionView({ asset, onBack }) {
                 </button>
                 <button
                   onClick={() => setActiveTab('collateral')}
-                  className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
-                    activeTab === 'collateral' ? 'text-white' : 'text-gray-500 hover:text-gray-300'
-                  }`}
+                  className={`pb-3 px-1 text-sm font-medium transition-colors relative ${activeTab === 'collateral' ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+                    }`}
                 >
                   <div className="flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -178,9 +233,8 @@ export default function BorrowPositionView({ asset, onBack }) {
                 </button>
                 <button
                   onClick={() => setActiveTab('debt')}
-                  className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
-                    activeTab === 'debt' ? 'text-white' : 'text-gray-500 hover:text-gray-300'
-                  }`}
+                  className={`pb-3 px-1 text-sm font-medium transition-colors relative ${activeTab === 'debt' ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+                    }`}
                 >
                   <div className="flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -207,7 +261,7 @@ export default function BorrowPositionView({ asset, onBack }) {
                     </div>
                     <div>
                       <div className="text-xs text-gray-500 mb-2">Supply APY</div>
-                      <div className="text-lg font-semibold text-[#c5ff4a]">35.03%</div>
+                      <div className="text-lg font-semibold text-[#c5ff4a]">{asset.supplyAPY}</div>
                     </div>
                     <div>
                       <div className="text-xs text-gray-500 mb-2">Borrow APY</div>
@@ -313,7 +367,7 @@ export default function BorrowPositionView({ asset, onBack }) {
                     onChange={(e) => handleLtvChange(parseFloat(e.target.value))}
                     className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-[#c5ff4a]"
                     style={{
-                      background: `linear-gradient(to right, #c5ff4a 0%, #c5ff4a ${(ltvPercent/90)*100}%, #404040 ${(ltvPercent/90)*100}%, #404040 100%)`
+                      background: `linear-gradient(to right, #c5ff4a 0%, #c5ff4a ${(ltvPercent / 90) * 100}%, #404040 ${(ltvPercent / 90) * 100}%, #404040 100%)`
                     }}
                   />
                   <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -402,14 +456,28 @@ export default function BorrowPositionView({ asset, onBack }) {
                 </div>
               </div>
 
-              <button className="w-full bg-[#c5ff4a] hover:bg-[#b0e641] text-neutral-900 font-semibold py-3 rounded-lg transition-colors">
-                Connect
+              {/* Updated Conditional Button */}
+              <button
+                onClick={handleButtonClick}
+                disabled={buttonDisabled}
+                className={`w-full font-semibold py-3 rounded-lg transition-colors ${isWalletConnected && isReadyForTransaction
+                    ? 'bg-[#c5ff4a] hover:bg-[#b0e641] text-neutral-900' // Transaction ready/active
+                    : 'bg-neutral-700 text-gray-400 cursor-not-allowed' // Connect or Disabled transaction
+                  }`}
+              >
+                {buttonText}
               </button>
+              {/* Display user address if connected */}
+              {isWalletConnected && userAddress && (
+                <p className="text-xs text-gray-500 mt-2 text-center truncate">
+                  Connected as: {userAddress}
+                </p>
+              )}
             </div>
           </div>
         </div>
       </div>
     </motion.div>
   )
-}
 
+}
