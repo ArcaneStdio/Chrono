@@ -8,138 +8,142 @@ import WalletModal from './components/WalletModal'
 import { connectWallet, disconnectWallet, configureFCL, subscribeToUser } from './utils/flowWallet'
 
 function App() {
-  const [activeView, setActiveView] = useState('lend')
-  const [isWalletConnected, setIsWalletConnected] = useState(false)
-  const [walletAddress, setWalletAddress] = useState('')
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [activeView, setActiveView] = useState('lend')
+  const [isWalletConnected, setIsWalletConnected] = useState(false)
+  const [walletAddress, setWalletAddress] = useState('')
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
-  useEffect(() => {
-    configureFCL()
+  useEffect(() => {
+    configureFCL()
 
-    const unsubscribe = subscribeToUser((user) => {
-      if (user && user.loggedIn && user.addr) {
-        setIsWalletConnected(true)
-        setWalletAddress(formatAddress(user.addr))
-      } else {
-        setIsWalletConnected(false)
-        setWalletAddress('')
-      }
-    })
+    const unsubscribe = subscribeToUser((user) => {
+      if (user && user.loggedIn && user.addr) {
+        setIsWalletConnected(true)
+        setWalletAddress(formatAddress(user.addr))
+      } else {
+        setIsWalletConnected(false)
+        setWalletAddress('')
+      }
+    })
 
-    return () => {
-      if (unsubscribe) unsubscribe()
-    }
-  }, [])
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
+  }, [])
 
-  const formatAddress = (address) => {
-    if (!address) return ''
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
-  }
+  const formatAddress = (address) => {
+    if (!address) return ''
+    return `${address.slice(0, 6)}...${address.slice(-4)}`
+  }
 
-  const handleConnect = () => {
-    setIsModalOpen(true)
-  }
+  const handleConnect = () => {
+    setIsModalOpen(true)
+  }
 
-  const handleConnectFlow = async () => {
-    try {
-      await connectWallet()
-    } catch (error) {
-      console.error('Failed to connect:', error)
-      alert('Failed to connect wallet. Please try again.')
-    }
-  }
+  const handleConnectFlow = async () => {
+    try {
+      await connectWallet()
+    } catch (error) {
+      console.error('Failed to connect:', error)
+      alert('Failed to connect wallet. Please try again.')
+    }
+  }
 
-  const handleDisconnect = async () => {
-    try {
-      await disconnectWallet()
-    } catch (error) {
-      console.error('Failed to disconnect:', error)
-    }
-  }
+  const handleDisconnect = async () => {
+    try {
+      await disconnectWallet()
+    } catch (error) {
+      console.error('Failed to disconnect:', error)
+    }
+  }
 
 
-  const pageVariants = {
-    initial: { 
-      opacity: 0, 
-      y: 8,      
-      scale: 0.99  
-    },
-    animate: { 
-      opacity: 1, 
-      y: 0,
-      scale: 1,
-      transition: {
-        duration: 0.25, 
-        ease: [0.4, 0, 0.2, 1]
-      }
-    },
-    exit: { 
-      opacity: 0, 
-      y: -8,    
-      scale: 0.99,
-      transition: {
-        duration: 0.2, 
-        ease: [0.4, 0, 1, 1]
-      }
-    }
-  }
+  const pageVariants = {
+    initial: { 
+      opacity: 0, 
+      y: 8,      
+      scale: 0.99  
+    },
+    animate: { 
+      opacity: 1, 
+      y: 0,
+      scale: 1,
+      transition: {
+        duration: 0.25, 
+        ease: [0.4, 0, 0.2, 1]
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      y: -8,    
+      scale: 0.99,
+      transition: {
+        duration: 0.2, 
+        ease: [0.4, 0, 1, 1]
+      }
+    }
+  }
 
-  return (
-    <div className="min-h-screen bg-neutral-950">
-      <Navbar 
-        activeView={activeView}
-        setActiveView={setActiveView}
-        isWalletConnected={isWalletConnected}
-        walletAddress={walletAddress}
-        onConnect={handleConnect}
-        onDisconnect={handleDisconnect}
-      />
-      
-      <main className="container mx-auto px-4 py-8">
-        <AnimatePresence mode="wait">
-          {activeView === 'lend' && (
-            <motion.div
-              key="lend"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-            >
-              <LendView />
-            </motion.div>
-          )}
-          {activeView === 'borrow' && (
-            <motion.div
-              key="borrow"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-            >
-              <BorrowView />
-            </motion.div>
-          )}
-          {activeView === 'pools' && (
-            <motion.div
-              key="pools"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-            >
-              <PoolsView />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
+  return (
+    <div className="min-h-screen bg-neutral-950">
+      <Navbar 
+        activeView={activeView}
+        setActiveView={setActiveView}
+        isWalletConnected={isWalletConnected}
+        walletAddress={walletAddress}
+        onConnect={handleConnectFlow}
+        onDisconnect={handleDisconnect}
+      />
+      
+      <main className="container mx-auto px-4 py-8">
+        <AnimatePresence mode="wait">
+          {activeView === 'lend' && (
+            <motion.div
+              key="lend"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <LendView 
+                isWalletConnected={isWalletConnected} 
+                onConnect={handleConnect} 
+                userAddress={walletAddress} 
+              />
+            </motion.div>
+          )}
+          {activeView === 'borrow' && (
+            <motion.div
+              key="borrow"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <BorrowView />
+            </motion.div>
+          )}
+          {activeView === 'pools' && (
+            <motion.div
+              key="pools"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <PoolsView />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
 
-      <WalletModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onConnectFlow={handleConnectFlow}
-      />
-    </div>
-  )
+      <WalletModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConnectFlow={handleConnectFlow}
+      />
+    </div>
+  )
 }
 
 export default App

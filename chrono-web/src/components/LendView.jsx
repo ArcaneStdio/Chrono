@@ -4,7 +4,7 @@ import { SearchIcon, TrendUpIcon, SortIcon } from './Icons'
 import LendPositionView from './LendPositionView'
 import { fetchVaultData, transformForLendView, getProtocolStats } from '../utils/vaultData'
 
-export default function LendView() {
+export default function LendView({ isWalletConnected, onConnect, userAddress }) {
   const [inWallet, setInWallet] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedAsset, setSelectedAsset] = useState(null)
@@ -27,9 +27,9 @@ export default function LendView() {
         setIsLoading(false)
       }
     }
-    
+
     loadVaultData()
-    
+
     // Refresh data every 5 minutes
     const interval = setInterval(loadVaultData, 5 * 60 * 1000)
     return () => clearInterval(interval)
@@ -43,7 +43,7 @@ export default function LendView() {
   // Transform vault data for display
   const allAssets = vaultData ? transformForLendView(vaultData) : []
 
-  const filteredAssets = allAssets.filter(asset => 
+  const filteredAssets = allAssets.filter(asset =>
     asset.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     asset.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
     asset.protocol.toLowerCase().includes(searchQuery.toLowerCase())
@@ -58,7 +58,15 @@ export default function LendView() {
   }
 
   if (selectedAsset) {
-    return <LendPositionView asset={selectedAsset} onBack={() => setSelectedAsset(null)} />
+    return (
+      <LendPositionView
+        asset={selectedAsset}
+        onBack={() => setSelectedAsset(null)}
+        isWalletConnected={isWalletConnected}
+        onConnect={onConnect}
+        userAddress={userAddress}
+      />
+    )
   }
 
   const SkeletonRow = () => (
@@ -98,7 +106,7 @@ export default function LendView() {
 
   return (
     <div className="space-y-6">
-      <motion.div 
+      <motion.div
         className="flex flex-col md:flex-row md:items-start md:justify-between gap-6"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -117,7 +125,7 @@ export default function LendView() {
         </div>
 
         <div className="flex gap-4 md:gap-8">
-          <motion.div 
+          <motion.div
             className="text-left md:text-right"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -131,7 +139,7 @@ export default function LendView() {
             )}
             <p className="text-xs text-gray-500 hidden md:block">{totalBorrowUSD}</p>
           </motion.div>
-          <motion.div 
+          <motion.div
             className="text-left md:text-right"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -183,23 +191,20 @@ export default function LendView() {
           </button>
         </div>
 
-        <button 
+        <button
           onClick={() => setInWallet(!inWallet)}
-          className={`md:ml-auto flex items-center justify-between gap-2 px-4 py-2 rounded-lg transition-all border ${
-            inWallet 
-              ? 'bg-neutral-700 border-neutral-600 text-white' 
+          className={`md:ml-auto flex items-center justify-between gap-2 px-4 py-2 rounded-lg transition-all border ${inWallet
+              ? 'bg-neutral-700 border-neutral-600 text-white'
               : 'bg-neutral-800 border-neutral-700 text-gray-400'
-          }`}
+            }`}
         >
           <span>In wallet</span>
-          <div className={`w-10 h-5 rounded-full relative transition-colors ${
-            inWallet ? 'bg-[#c5ff4a]' : 'bg-neutral-600'
-          }`}>
-            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${
-              inWallet ? 'right-0.5' : 'left-0.5'
-            }`}></div>
+          <div className={`w-10 h-5 rounded-full relative transition-colors ${inWallet ? 'bg-[#c5ff4a]' : 'bg-neutral-600'
+            }`}>
+            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${inWallet ? 'right-0.5' : 'left-0.5'
+              }`}></div>
           </div>
-          
+
         </button>
       </div>
 
@@ -253,79 +258,79 @@ export default function LendView() {
               </>
             ) : (
               filteredAssets.map((asset, index) => (
-              <motion.tr 
-                key={index}
-                onClick={() => setSelectedAsset(asset)}
-                className="border-b border-neutral-700/50 hover:bg-neutral-800/50 transition-colors cursor-pointer"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ 
-                  duration: 0.3, 
-                  delay: index * 0.05,
-                  ease: [0.4, 0, 0.2, 1]
-                }}
-              >
-                <td className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center text-white font-semibold">
-                      {asset.symbol.substring(0, 2)}
-                    </div>
-                    <div>
-                      <div className="text-white font-medium">{asset.name}</div>
-                      <div className="text-gray-400 text-sm">{asset.symbol}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="p-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-neutral-600 flex items-center justify-center text-xs text-white">
-                      {asset.protocol[0]}
-                    </div>
-                    <span className="text-gray-300 text-sm">{asset.protocol}</span>
-                  </div>
-                </td>
-                <td className="p-4">
-                  <div className="flex items-center gap-1">
-                    <TrendUpIcon className="w-4 h-4 text-green-400" />
-                    <span className="text-white font-medium">{asset.supplyAPY}</span>
-                  </div>
-                </td>
-                <td className="p-4">
-                  <div>
-                    <div className="text-white font-medium">{asset.totalSupply}</div>
-                    <div className="text-gray-400 text-sm">{asset.totalSupplyToken}</div>
-                  </div>
-                </td>
-                <td className="p-4">
-                  <div className="flex items-center gap-1">
-                    {asset.exposure > 0 ? (
-                      <div className="flex items-center gap-1">
-                        <div className="w-5 h-5 rounded-full bg-neutral-600 border border-neutral-500"></div>
-                        <div className="w-5 h-5 rounded-full bg-neutral-600 border border-neutral-500 -ml-2"></div>
-                        {asset.exposure > 2 && (
-                          <span className="text-gray-400 text-sm ml-1">+{asset.exposure - 2}</span>
-                        )}
+                <motion.tr
+                  key={index}
+                  onClick={() => setSelectedAsset(asset)}
+                  className="border-b border-neutral-700/50 hover:bg-neutral-800/50 transition-colors cursor-pointer"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{
+                    duration: 0.3,
+                    delay: index * 0.05,
+                    ease: [0.4, 0, 0.2, 1]
+                  }}
+                >
+                  <td className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center text-white font-semibold">
+                        {asset.symbol.substring(0, 2)}
                       </div>
-                    ) : (
-                      <span className="text-gray-500">—</span>
-                    )}
-                  </div>
-                </td>
-                <td className="p-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-neutral-700 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full ${getUtilizationColor(asset.utilizationPercent)}`}
-                        style={{ width: asset.utilization }}
-                      ></div>
+                      <div>
+                        <div className="text-white font-medium">{asset.name}</div>
+                        <div className="text-gray-400 text-sm">{asset.symbol}</div>
+                      </div>
                     </div>
-                    <span className="text-gray-300 font-medium text-sm">
-                      {asset.utilization}
-                    </span>
-                  </div>
-                </td>
-              </motion.tr>
-            )))}
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-neutral-600 flex items-center justify-center text-xs text-white">
+                        {asset.protocol[0]}
+                      </div>
+                      <span className="text-gray-300 text-sm">{asset.protocol}</span>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-1">
+                      <TrendUpIcon className="w-4 h-4 text-green-400" />
+                      <span className="text-white font-medium">{asset.supplyAPY}</span>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div>
+                      <div className="text-white font-medium">{asset.totalSupply}</div>
+                      <div className="text-gray-400 text-sm">{asset.totalSupplyToken}</div>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-1">
+                      {asset.exposure > 0 ? (
+                        <div className="flex items-center gap-1">
+                          <div className="w-5 h-5 rounded-full bg-neutral-600 border border-neutral-500"></div>
+                          <div className="w-5 h-5 rounded-full bg-neutral-600 border border-neutral-500 -ml-2"></div>
+                          {asset.exposure > 2 && (
+                            <span className="text-gray-400 text-sm ml-1">+{asset.exposure - 2}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">—</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-2 bg-neutral-700 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${getUtilizationColor(asset.utilizationPercent)}`}
+                          style={{ width: asset.utilization }}
+                        ></div>
+                      </div>
+                      <span className="text-gray-300 font-medium text-sm">
+                        {asset.utilization}
+                      </span>
+                    </div>
+                  </td>
+                </motion.tr>
+              )))}
             {!isLoading && filteredAssets.length === 0 && (
               <tr>
                 <td colSpan="6" className="p-8 text-center text-gray-500">

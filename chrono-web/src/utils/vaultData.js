@@ -6,16 +6,9 @@ const VAULT_DATA_PATH = '/vault.json';
  */
 export async function fetchVaultData() {
   try {
-    // In production, this will be served from the public directory
-    // During development, make sure vault.json is in the public folder
     const response = await fetch(VAULT_DATA_PATH + '?t=' + Date.now());
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch vault data: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    return data;
+    if (!response.ok) throw new Error(`Failed to fetch vault data: ${response.status}`);
+    return await response.json();
   } catch (error) {
     console.error('Error fetching vault data:', error);
     throw error;
@@ -23,46 +16,46 @@ export async function fetchVaultData() {
 }
 
 export function formatUSD(value) {
-  if (value >= 1e9) {
-    return `$${(value / 1e9).toFixed(2)}B`;
-  }
-  if (value >= 1e6) {
-    return `$${(value / 1e6).toFixed(2)}M`;
-  }
-  if (value >= 1e3) {
-    return `$${(value / 1e3).toFixed(2)}K`;
-  }
+  if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
+  if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
   return `$${value.toFixed(2)}`;
 }
 
 export function formatTokenAmount(value, symbol, decimals = 2) {
-  if (value >= 1e6) {
-    return `${(value / 1e6).toFixed(decimals)}M ${symbol}`;
-  }
-  if (value >= 1e3) {
-    return `${(value / 1e3).toFixed(decimals)}K ${symbol}`;
-  }
+  if (value >= 1e6) return `${(value / 1e6).toFixed(decimals)}M ${symbol}`;
+  if (value >= 1e3) return `${(value / 1e3).toFixed(decimals)}K ${symbol}`;
   return `${value.toFixed(decimals)} ${symbol}`;
 }
 
 /**
+ * Euler-style Linear Kink IRM Parameters
+ */
+const baseRate = 0.02;     // 2%
+const kink = 0.8;          // 80% utilization
+const slope1 = 0.08;       // 8% slope before kink
+const slope2 = 1.0;        // 100% slope after kink
+const reserveFactor = 0.1; // 10% reserve
+
+/**
  * Calculate borrow APY based on utilization rate
- * TODO: This is a placeholder
  */
 export function calculateBorrowAPY(utilizationRate) {
-  // Simple linear model: APY = baseRate + utilizationRate * multiplier
-  const baseRate = 2.0;
-  const multiplier = 0.1;
-  return (baseRate + utilizationRate * multiplier).toFixed(2) + '%';
+  const u = utilizationRate / 100;
+  let rate;
+  if (u <= kink) rate = baseRate + slope1 * u;
+  else rate = baseRate + slope1 * kink + slope2 * (u - kink);
+  return (rate * 100).toFixed(2) + '%';
 }
 
 /**
  * Calculate supply APY based on borrow APY and utilization
  */
 export function calculateSupplyAPY(borrowAPY, utilizationRate) {
-  const borrowRate = parseFloat(borrowAPY);
-  const utilization = utilizationRate / 100;
-  return (borrowRate * utilization * 0.9).toFixed(2) + '%'; // 90% goes to suppliers
+  const borrowRate = parseFloat(borrowAPY) / 100;
+  const u = utilizationRate / 100;
+  const supplyRate = borrowRate * u * (1 - reserveFactor);
+  return (supplyRate * 100).toFixed(2) + '%';
 }
 
 /**
@@ -77,17 +70,14 @@ export function getVaultBySymbol(vaults, symbol) {
  */
 export function isDataStale(timestamp) {
   const dataAge = Date.now() - new Date(timestamp).getTime();
-  const fourHours = 4 * 60 * 60 * 1000;
-  return dataAge > fourHours;
+  return dataAge > 4 * 60 * 60 * 1000;
 }
 
 /**
  * Transform vault data for the Lend view
  */
 export function transformForLendView(vaultData) {
-  if (!vaultData || !vaultData.vaults) {
-    return [];
-  }
+  if (!vaultData || !vaultData.vaults) return [];
 
   return vaultData.vaults.map(vault => {
     const borrowAPY = calculateBorrowAPY(vault.utilizationRate);
@@ -97,16 +87,15 @@ export function transformForLendView(vaultData) {
       name: vault.name,
       symbol: vault.symbol,
       protocol: 'Chrono',
-      supplyAPY: supplyAPY,
+      supplyAPY,
       totalSupply: formatUSD(vault.totalDepositedUSD),
       totalSupplyToken: formatTokenAmount(vault.totalDeposited, vault.symbol),
       exposure: vault.numberOfActiveBorrowPositions,
       utilization: vault.utilizationRate.toFixed(2) + '%',
       utilizationPercent: vault.utilizationRate,
-      // Additional data for detail view
       totalBorrowed: formatUSD(vault.totalBorrowedUSD),
       availableLiquidity: formatUSD(vault.availableLiquidityUSD),
-      borrowAPY: borrowAPY,
+      borrowAPY,
       price: vault.price
     };
   });
@@ -116,25 +105,21 @@ export function transformForLendView(vaultData) {
  * Transform vault data for the Borrow view
  */
 export function transformForBorrowView(vaultData) {
-  if (!vaultData || !vaultData.vaults) {
-    return [];
-  }
+  if (!vaultData || !vaultData.vaults) return [];
 
   return vaultData.vaults
-    .filter(vault => vault.availableLiquidity > 0) // Only show vaults with liquidity
+    .filter(vault => vault.availableLiquidity > 0)
     .map(vault => {
       const borrowAPY = calculateBorrowAPY(vault.utilizationRate);
-      
       return {
         name: vault.name,
         symbol: vault.symbol,
         protocol: 'Chrono',
-        borrowAPY: borrowAPY,
+        borrowAPY,
         available: formatUSD(vault.availableLiquidityUSD),
         availableToken: formatTokenAmount(vault.availableLiquidity, vault.symbol),
-        maxLTV: '75%', 
+        maxLTV: '75%',
         liquidationThreshold: '85%',
-        // Additional data
         price: vault.price,
         utilization: vault.utilizationRate
       };
@@ -145,12 +130,9 @@ export function transformForBorrowView(vaultData) {
  * Get protocol-wide statistics
  */
 export function getProtocolStats(vaultData) {
-  if (!vaultData || !vaultData.protocolStats) {
-    return null;
-  }
-
+  if (!vaultData || !vaultData.protocolStats) return null;
   const stats = vaultData.protocolStats;
-  
+
   return {
     totalValueLocked: formatUSD(stats.totalValueLocked),
     totalBorrowed: formatUSD(stats.totalBorrowed),
@@ -161,4 +143,3 @@ export function getProtocolStats(vaultData) {
     lastUpdate: vaultData.timestamp
   };
 }
-

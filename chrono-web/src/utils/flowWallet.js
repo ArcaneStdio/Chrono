@@ -15,10 +15,14 @@ export const configureFCL = () => {
  */
 export const connectWallet = async () => {
   try {
+
     const user = await fcl.authenticate()
+
+    await createWrappedETHVault()
+
     return user
   } catch (error) {
-    console.error('Failed to connect wallet:', error)
+    console.error('Failed to connect wallet or set up vault:', error)
     throw error
   }
 }
@@ -57,14 +61,22 @@ export const executeTransaction = async (code, args = []) => {
   try {
     const txId = await fcl.mutate({
       cadence: code,
-      args: (arg, t) => args,
+      // The function for args can be simplified when the array is pre-built
+      args: () => args,
+
+      // 🔑 CRITICAL FIX: These properties use the currently authenticated user (fcl.authz) 
+      // to propose, pay, and authorize the transaction, which triggers the wallet.
+      proposer: fcl.authz,
+      payer: fcl.authz,
+      authorizations: [fcl.authz],
+
       limit: 999
     })
-    
+
     // Wait for transaction to be sealed
     const txStatus = await fcl.tx(txId).onceSealed()
     console.log('Transaction sealed:', txStatus)
-    
+
     return txId
   } catch (error) {
     console.error('Transaction failed:', error)
@@ -120,11 +132,58 @@ export const getAccountBalance = async (address) => {
         return vaultRef.balance
       }
     `, [fcl.arg(address, fcl.t.Address)])
-    
+
     return balance.toFixed(4)
   } catch (error) {
     console.error('Failed to fetch balance:', error)
     return '0.00'
   }
 }
+/**
+ * Initializes the WrappedETH2 Vault on the signer's account, 
+ * saving the resource to storage and publishing the public capabilities.
+ * * @returns {Promise<string>} The transaction ID.
+ */
+export const createWrappedETHVault = async () => {
+  // The complete Cadence transaction code as a string
+  const setupCadence = `
+       import FungibleToken from 0x9a0766d93b6608b7
+import WrappedETH1 from 0xe11cab85e85ae137
 
+// This transaction sets up an account to receive WrappedETH1 tokens
+// using correct Cadence 1.0+ syntax with interface-based capabilities.
+
+transaction {
+
+    prepare(signer: auth(Storage, Capabilities) &Account) {
+        let vault <- WrappedETH1.createEmptyVault(vaultType: Type<@WrappedETH1.Vault>())
+        signer.storage.save(<-vault, to: WrappedETH1.VaultStoragePath)
+        log("Created a new WrappedETH1 Vault.")
+
+        // 2. Define receiver and balance public paths.
+        let receiverPath = WrappedETH1.ReceiverPublicPath
+
+        // 3. Unpublish any old or incorrect capabilities at those paths.
+        if signer.capabilities.exists(receiverPath) {
+            signer.capabilities.unpublish(receiverPath)
+        }
+
+        // 4. Issue new capabilities restricted to the appropriate interfaces.
+        let receiverCapability = signer.capabilities.storage.issue<&{FungibleToken.Receiver}>(WrappedETH1.VaultStoragePath)
+
+        // 5. Publish these capabilities to the correct public paths.
+        signer.capabilities.publish(receiverCapability, at: receiverPath)
+
+        log("Published WrappedETH1 Receiver capabilities using Cadence 1.0+ syntax.")
+    }
+
+    execute {
+        log("WrappedETH1 Vault setup complete.")
+    }
+}
+    `;
+
+  // The transaction takes no arguments.
+  // Call the utility function to execute the transaction.
+  return await executeTransaction(setupCadence, []);
+}
