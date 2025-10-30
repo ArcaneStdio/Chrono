@@ -11,7 +11,7 @@ const path = require('path');
 
 // Configuration
 const FLOW_SCRIPT_PATH = './cadence/scripts/vaultDataScript.cdc';
-const OUTPUT_FILE = './vault.json';
+const OUTPUT_FILE = './chrono-web/public/vault.json';
 const NETWORK = 'testnet';
 
 /**

@@ -21,12 +21,23 @@ export default function BorrowPositionView({
 }) {
 
   const [activeTab, setActiveTab] = useState('pair')
-  const [supplyAmount, setSupplyAmount] = useState('')
   const [borrowAmount, setBorrowAmount] = useState('')
   const [ltvPercent, setLtvPercent] = useState(0)
   const [timeMinutes, setTimeMinutes] = useState(0)
   const [timeHours, setTimeHours] = useState(0)
   const [timeDays, setTimeDays] = useState(0)
+
+  // Extract available liquidity value (remove $ and K, convert to number)
+  const getAvailableLiquidity = () => {
+    // asset.available is like "$541.96K" or "143.00 WETH"
+    // We want the token amount from asset.availableToken
+    const tokenAmount = asset.availableToken || '0'
+    // Extract just the number (e.g., "143.00 WETH" -> "143.00")
+    const match = tokenAmount.match(/[\d.]+/)
+    return match ? match[0] : '0'
+  }
+
+  const supplyAmount = getAvailableLiquidity()
 
   const totalMinutes = timeDays * 24 * 60 + timeHours * 60 + timeMinutes
 
@@ -119,7 +130,7 @@ export default function BorrowPositionView({
     await handleBorrow()
   }
 
-  const buttonDisabled = isWalletConnected
+  const buttonDisabled = isWalletConnected && !isReadyForTransaction  
   // --- End New Borrow Transaction Logic ---
 
 

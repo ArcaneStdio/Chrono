@@ -17,6 +17,8 @@
   "license": "MIT",
   "engines": {
     "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "@onflow/fcl": "^1.20.3"
   }
 }
-

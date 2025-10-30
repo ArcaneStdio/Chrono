@@ -9,6 +9,26 @@ export default function BorrowView() {
   const [isLoading, setIsLoading] = useState(true)
   const [vaultData, setVaultData] = useState(null)
   const [error, setError] = useState(null)
+
+  const [isWalletConnected, setIsWalletConnected] = useState(false)
+  const [userAddress, setUserAddress] = useState(null)
+
+  const handleWalletConnect = async () => {
+    try {
+      // Example for MetaMask/Ethereum wallet
+      if (window.ethereum) {
+        const accounts = await window.ethereum.request({ 
+          method: 'eth_requestAccounts' 
+        })
+        setUserAddress(accounts[0])
+        setIsWalletConnected(true)
+      } else {
+        alert('Please install MetaMask or another Web3 wallet')
+      }
+    } catch (error) {
+      console.error('Failed to connect wallet:', error)
+    }
+  }
   
   useEffect(() => {
     async function loadVaultData() {
@@ -35,7 +55,14 @@ export default function BorrowView() {
   const borrowAssets = vaultData ? transformForBorrowView(vaultData) : []
 
   if (selectedAsset) {
-    return <BorrowPositionView asset={selectedAsset} onBack={() => setSelectedAsset(null)} />
+    return <BorrowPositionView 
+      asset={selectedAsset} 
+      onBack={() => setSelectedAsset(null)}
+      isWalletConnected={isWalletConnected}
+      onConnect={handleWalletConnect}
+      userAddress={userAddress}
+    />
+
   }
 
   const SkeletonRow = () => (

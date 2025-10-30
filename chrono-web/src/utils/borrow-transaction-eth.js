@@ -90,11 +90,11 @@ export const createBorrowingPosition = async (
     // 2. Construct the FCL Arguments array with correct types
     const transactionArgs = [
         // Arg 1: collateralAmount (UFix64)
-        fcl.arg(collateralAmount, fcl.t.UFix64),
+        fcl.arg((parseFloat(collateralAmount).toFixed(8), fcl.t.UFix64)),
         // Arg 2: borrowAmount (UFix64)
-        fcl.arg(borrowAmount, fcl.t.UFix64),
+        fcl.arg((parseFloat(borrowAmount).toFixed(8), fcl.t.UFix64)),
         // Arg 3: durationMinutes (UInt64)
-        fcl.arg(durationMinutes, fcl.t.UInt64), 
+        fcl.arg(durationMinutes, fcl.t.UInt64),
     ];
 
     // 3. Execute the transaction using your utility function
