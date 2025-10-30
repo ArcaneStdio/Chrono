@@ -1,13 +1,12 @@
 import * as fcl from "@onflow/fcl";
-import * as t from "@onflow/types";
-import { executeTransaction } from './flowWallet'; // Assuming your FCL utilities are here
+import * as t from "@onflow/types"; // Make sure you import types as 't'
+import { executeTransaction } from './flowWallet'; 
 
 /**
  * Creates a new Time Lending Borrowing Position using WETH as collateral to borrow USDC.
- * It also handles the FLOW payment for the Band Oracle fee.
- * * @param {string} collateralAmount - Amount of Wrapped ETH to deposit (e.g., "10.0").
- * @param {string} borrowAmount - Amount of Wrapped USDC to borrow (e.g., "500.0").
- * @param {string} durationMinutes - Duration of the loan in minutes (must be a string representing an integer, e.g., "1440").
+ * @param {string} collateralAmount - Amount of Wrapped ETH to deposit (UFix64 as string).
+ * @param {string} borrowAmount - Amount of Wrapped USDC to borrow (UFix64 as string).
+ * @param {string} durationMinutes - Duration of the loan in minutes (UInt64 as string).
  * @returns {Promise<string>} The transaction ID.
  */
 export const createBorrowingPosition = async (
@@ -15,7 +14,7 @@ export const createBorrowingPosition = async (
     borrowAmount, 
     durationMinutes
 ) => {
-    // The complete Cadence transaction code as a string
+    // The complete Cadence transaction code as a string - CLEANED OF U+00A0 characters
     const createBorrowingCadence = `
         import FungibleToken from 0x9a0766d93b6608b7
         import FlowToken from 0x7e60df042a9c0868
@@ -26,9 +25,9 @@ export const createBorrowingPosition = async (
 
         // Transaction to borrow USDC using Wrapped ETH as collateral
         transaction(
-            collateralAmount: UFix64,      
-            borrowAmount: UFix64,          
-            durationMinutes: UInt64        
+            collateralAmount: UFix64,
+            borrowAmount: UFix64,
+            durationMinutes: UInt64
         ) {
             
             let borrowingManagerRef: &TimeLendingProtocol2.BorrowingManager
@@ -89,16 +88,15 @@ export const createBorrowingPosition = async (
 
     // 2. Construct the FCL Arguments array with correct types
     const transactionArgs = [
-        // Arg 1: collateralAmount (UFix64)
-        fcl.arg((parseFloat(collateralAmount).toFixed(8), fcl.t.UFix64)),
-        // Arg 2: borrowAmount (UFix64)
-        fcl.arg((parseFloat(borrowAmount).toFixed(8), fcl.t.UFix64)),
-        // Arg 3: durationMinutes (UInt64)
-        fcl.arg(durationMinutes, fcl.t.UInt64),
+        // Arg 1: collateralAmount (UFix64) - FIX: Use t.UFix64 and pass the formatted string
+        fcl.arg(parseFloat(collateralAmount).toFixed(8), t.UFix64),
+        // Arg 2: borrowAmount (UFix64) - FIX: Use t.UFix64 and pass the formatted string
+        fcl.arg(parseFloat(borrowAmount).toFixed(8), t.UFix64),
+        // Arg 3: durationMinutes (UInt64) - FIX: Use t.UInt64
+        fcl.arg(durationMinutes, t.UInt64), 
     ];
 
     // 3. Execute the transaction using your utility function
-    // Your utility handles the fcl.mutate call and waits for the status.
     const txId = await executeTransaction(createBorrowingCadence, transactionArgs);
     
     return txId;
