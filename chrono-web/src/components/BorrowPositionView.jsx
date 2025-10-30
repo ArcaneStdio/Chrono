@@ -109,11 +109,17 @@ export default function BorrowPositionView({
     ? (isReadyForTransaction ? 'Create Borrow Position' : 'Enter Amounts')
     : 'Connect Wallet'
 
-  const handleButtonClick = isWalletConnected
-    ? isReadyForTransaction ? handleBorrow : () => { } // Connected but not ready -> do nothing
-    : onConnect
+  const handleButtonClick = async () => {
+    if (!isWalletConnected) {
+      await onConnect()
+      return
+    }
 
-  const buttonDisabled = isWalletConnected && !isReadyForTransaction
+    if (!isReadyForTransaction) return
+    await handleBorrow()
+  }
+
+  const buttonDisabled = isWalletConnected
   // --- End New Borrow Transaction Logic ---
 
 
@@ -459,10 +465,9 @@ export default function BorrowPositionView({
               {/* Updated Conditional Button */}
               <button
                 onClick={handleButtonClick}
-                disabled={buttonDisabled}
                 className={`w-full font-semibold py-3 rounded-lg transition-colors ${isWalletConnected && isReadyForTransaction
-                    ? 'bg-[#c5ff4a] hover:bg-[#b0e641] text-neutral-900' // Transaction ready/active
-                    : 'bg-neutral-700 text-gray-400 cursor-not-allowed' // Connect or Disabled transaction
+                    ? 'bg-[#c5ff4a] hover:bg-[#b0e641] text-neutral-900'
+                    : 'bg-neutral-700 text-gray-400 cursor-not-allowed'
                   }`}
               >
                 {buttonText}

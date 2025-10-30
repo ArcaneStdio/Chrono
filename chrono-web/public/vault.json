@@ -1,10 +1,10 @@
 {
-  "timestamp": "2025-10-30T17:25:52.596Z",
-  "lastUpdate": 1761845152598,
+  "timestamp": "2025-10-30T18:55:47.117Z",
+  "lastUpdate": 1761850547117,
   "protocolStats": {
-    "totalValueLocked": 458788.726036,
+    "totalValueLocked": 545956.5651929,
     "totalBorrowed": 0,
-    "activeLendingPositions": 4,
+    "activeLendingPositions": 5,
     "activeBorrowingPositions": 0,
     "unhealthyPositions": 0,
     "overduePositions": 0
@@ -12,17 +12,17 @@
   "vaults": [
     {
       "tokenType": "WrappedETH",
-      "totalDeposited": 120,
+      "totalDeposited": 143,
       "totalBorrowed": 0,
-      "availableLiquidity": 120,
+      "availableLiquidity": 143,
       "utilizationRate": 0,
       "numberOfActiveBorrowPositions": 0,
-      "numberOfActiveLendingPositions": 2,
+      "numberOfActiveLendingPositions": 3,
       "price": 3789.9060503,
       "lastPriceUpdate": 1761841360,
-      "totalDepositedUSD": 454788.726036,
+      "totalDepositedUSD": 541956.5651929,
       "totalBorrowedUSD": 0,
-      "availableLiquidityUSD": 454788.726036,
+      "availableLiquidityUSD": 541956.5651929,
       "symbol": "WETH",
       "name": "Wrapped ETH"
     },
