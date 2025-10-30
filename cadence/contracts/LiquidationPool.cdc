@@ -526,9 +526,20 @@ access(all) contract LiquidationPool {
 
             let collateralType = TimeLendingProtocol2.getBorrowingPosition(id: positionId)?.collateralType ?? panic("Could not get collateral type")
 
-            // Get collateral recipient capability
-            let collateralRecipient = LiquidationPool.account.capabilities.get<&{FungibleToken.Receiver}>(WrappedETH1.ReceiverPublicPath)
+            var collateralRecipient: &{FungibleToken.Receiver} = nil
+
+            if collateralType.toString().contains("ETH") {
+                collateralRecipient = LiquidationPool.account.capabilities.get<&{FungibleToken.Receiver}>(WrappedETH1.ReceiverPublicPath)
                 .borrow() ?? panic("Could not borrow ETH receiver capability")
+            } else if collateralType.toString().contains("USDC") {
+                collateralRecipient = LiquidationPool.account.capabilities.get<&{FungibleToken.Receiver}>(WrappedUSDC1.ReceiverPublicPath)
+                .borrow() ?? panic("Could not borrow USDC receiver capability")
+            } else if collateralType.toString().contains("FLOW") {
+                collateralRecipient = LiquidationPool.account.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+                .borrow() ?? panic("Could not borrow Flow receiver capability") 
+            } else {
+                panic("Unsupported collateral type")
+            }
             // Execute hard liquidation
             TimeLendingProtocol2.hardLiquidateOverduePosition(
                 positionId: positionId,
@@ -547,7 +558,7 @@ access(all) contract LiquidationPool {
                 liquidationType: "HardLiquidation",
                 liquidator: liquidatorAddress,
                 collateralReceived: position.collateralAmount,
-                collateralType: "ETH",
+                collateralType: collateralType,
                 debtRepaid: totalDebt,
                 profitGenerated: profitInUSD
             )
