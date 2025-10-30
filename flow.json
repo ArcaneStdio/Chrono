@@ -6,6 +6,12 @@
 				"testing": "179b6b1cb6755e31"
 			}
 		},
+		"LiquidationPool": {
+			"source": "cadence/contracts/LiquidationPool.cdc",
+			"aliases": {
+				"testing": "179b6b1cb6755e31"
+			}
+		},
 		"Oracle": {
 			"source": "cadence/contracts/Oracle.cdc",
 			"aliases": {
@@ -117,8 +123,7 @@
 		},
 		"testnet": {
 			"testnet": [
-				"WrappedUSDC",
-				"TimeLendingProtocol2"
+				"LiquidationPool"
 			]
 		}
 	}
