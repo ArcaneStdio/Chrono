@@ -8,7 +8,6 @@ transaction(usdcAmount: UFix64) {
     
     let usdcVault: @WrappedUSDC1.Vault
     let oraclePayment: @FlowToken.Vault
-    let poolAdmin: &LiquidationPool.PoolAdmin
     let signerAddress: Address
     
     prepare(signer: auth(BorrowValue) &Account) {
@@ -28,13 +27,12 @@ transaction(usdcAmount: UFix64) {
         
         self.oraclePayment <- flowVaultRef.withdraw(amount: BandOracle.getFee()) as! @FlowToken.Vault
         
-        // Borrow PoolAdmin capability
-        self.poolAdmin = LiquidationPool.PoolAdmin()
+    
     }
     
     execute {
         // Add USDC liquidity to the pool
-        let sharesMinted = self.poolAdmin.contributeUSDC(
+        let sharesMinted = LiquidationPool.contributeUSDC(
             usdcVault: <-self.usdcVault,
             contributor: self.signerAddress,
             oraclePayment: <-self.oraclePayment
