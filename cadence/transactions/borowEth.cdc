@@ -15,7 +15,8 @@ transaction(
     let borrowingManagerRef: &TimeLendingProtocol2.BorrowingManager
     let collateralVault: @{FungibleToken.Vault}
     let borrowedTokensReceiver: &{FungibleToken.Receiver}
-    let oraclePayment: @{FungibleToken.Vault}
+    let oraclePayment1: @{FungibleToken.Vault}
+    let oraclePayment2: @{FungibleToken.Vault}
     let signerAddress: Address
     
     prepare(signer: auth(BorrowValue, Storage, Capabilities) &Account) {
@@ -41,7 +42,8 @@ transaction(
             from: /storage/flowTokenVault
         ) ?? panic("Could not borrow FLOW vault from storage")
         
-        self.oraclePayment <- flowVault.withdraw(amount: BandOracle.getFee())
+        self.oraclePayment1 <- flowVault.withdraw(amount: BandOracle.getFee())
+        self.oraclePayment2 <- flowVault.withdraw(amount: BandOracle.getFee())
     }
     
     execute {
