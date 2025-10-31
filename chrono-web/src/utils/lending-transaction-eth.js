@@ -30,6 +30,7 @@ export const createLendingPosition = async (amount) => {
             
             // Withdraw ETH to lend
             self.lenderVault <- vaultRef.withdraw(amount: amount) as! @WrappedETH1.Vault
+
             
             // Get reference to the lending manager
             // Note: If borrowLendingManager is a private function, this will fail. It must be accessible.
@@ -40,9 +41,9 @@ export const createLendingPosition = async (amount) => {
             // Create lending position
             let positionId = self.lendingManagerRef.createLendingPosition(
                 tokenVault: <-self.lenderVault,
-                lender: self.lendingManagerRef.owner!.address
-            )
-            
+                lender: self.signer
+            ) ?? panic("Could not create lending position")
+
             log("Lending position created with ID: ".concat(positionId.toString()))
         }
     }
