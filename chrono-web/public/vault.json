@@ -1,0 +1,62 @@
+{
+  "timestamp": "2025-10-31T12:50:01.224Z",
+  "lastUpdate": 1761915001224,
+  "protocolStats": {
+    "totalValueLocked": 2136472.2763534384,
+    "totalBorrowed": 24963.47135,
+    "activeLendingPositions": 27,
+    "activeBorrowingPositions": 8,
+    "unhealthyPositions": 0,
+    "overduePositions": 6
+  },
+  "vaults": [
+    {
+      "tokenType": "WrappedETH",
+      "totalDeposited": 544.1,
+      "totalBorrowed": 0,
+      "availableLiquidity": 544.1,
+      "utilizationRate": 0,
+      "numberOfActiveBorrowPositions": 0,
+      "numberOfActiveLendingPositions": 19,
+      "price": 3877.79135518,
+      "lastPriceUpdate": 1761913888,
+      "totalDepositedUSD": 2109906.2763534384,
+      "totalBorrowedUSD": 0,
+      "availableLiquidityUSD": 2109906.2763534384,
+      "symbol": "WETH",
+      "name": "Wrapped ETH"
+    },
+    {
+      "tokenType": "WrappedUSDC",
+      "totalDeposited": 26566,
+      "totalBorrowed": 24963.47135,
+      "availableLiquidity": 1602.52865,
+      "utilizationRate": 93.967745,
+      "numberOfActiveBorrowPositions": 8,
+      "numberOfActiveLendingPositions": 7,
+      "price": 1,
+      "lastPriceUpdate": 1761435955,
+      "totalDepositedUSD": 26566,
+      "totalBorrowedUSD": 24963.47135,
+      "availableLiquidityUSD": 1602.52865,
+      "symbol": "USDC",
+      "name": "USDC"
+    },
+    {
+      "tokenType": "FlowToken",
+      "totalDeposited": 2345,
+      "totalBorrowed": 0,
+      "availableLiquidity": 2345,
+      "utilizationRate": 0,
+      "numberOfActiveBorrowPositions": 0,
+      "numberOfActiveLendingPositions": 1,
+      "price": 0,
+      "lastPriceUpdate": 1761435955,
+      "totalDepositedUSD": 0,
+      "totalBorrowedUSD": 0,
+      "availableLiquidityUSD": 0,
+      "symbol": "FLOW",
+      "name": "FLOW"
+    }
+  ]
+}
