@@ -18,10 +18,12 @@ transaction(
     let oraclePayment: @{FungibleToken.Vault}
     let position: TimeLendingProtocol2.BorrowingPosition
     let signerAddress: Address
-    
+    let borrowAuth: auth(Storage) &Account
+
     prepare(signer: auth(BorrowValue, Storage, Capabilities) &Account) {
         self.signerAddress = signer.address
-        
+        self.borrowAuth = signer
+
         // Get the existing borrowing position
         self.position = TimeLendingProtocol2.getBorrowingPosition(id: positionId)
             ?? panic("Position does not exist")
@@ -91,7 +93,8 @@ transaction(
             positionId: positionId,
             additionalBorrowAmount: additionalBorrowAmount,
             borrowedTokensRecipient: self.borrowedTokensReceiver,
-            oraclePayment: <- self.oraclePayment
+            oraclePayment: <- self.oraclePayment,
+            borrowerAuth: self.borrowAuth
         )
         
         // Get updated position

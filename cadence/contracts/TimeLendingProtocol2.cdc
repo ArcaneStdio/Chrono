@@ -542,7 +542,7 @@ access(all) contract TimeLendingProtocol2 {
     access(all) resource BorrowingManager {
     
     access(all) fun createBorrowingPosition(
-        collateralVault: @{FungibleToken.Vault},
+        collateralVault: @{FungibleToken.Vault}
         borrowTokenType: Type,
         borrowAmount: UFix64,
         durationMinutes: UInt64,

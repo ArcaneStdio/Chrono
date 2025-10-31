@@ -12,11 +12,14 @@ transaction(positionId: UInt64) {
     let lendingManagerRef: &TimeLendingProtocol2.LendingManager
     let recipient: &{FungibleToken.Receiver}
     let position: TimeLendingProtocol2.LendingPosition
+    let borrowAuth: auth(Storage) &Account
     
     prepare(signer: auth(BorrowValue, Storage, Capabilities) &Account) {
         // Get the lending position to check details
         self.position = TimeLendingProtocol2.getLendingPosition(id: positionId)
             ?? panic("Lending position does not exist")
+
+        self.borrowAuth = signer
         
         // Verify the signer is the lender
         if self.position.lender != signer.address {
@@ -67,7 +70,8 @@ transaction(positionId: UInt64) {
         // Withdraw the lending position
         self.lendingManagerRef.withdrawLending(
             positionId: positionId,
-            recipient: self.recipient
+            recipient: self.recipient,
+            borrowerAuth: self.borrowAuth
         )
         
         log("")
