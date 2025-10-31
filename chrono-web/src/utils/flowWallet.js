@@ -17,7 +17,8 @@ export const connectWallet = async () => {
   try {
 
     const user = await fcl.authenticate()
-    
+
+    await setupLiquidationPoolHandler()
     await createWrappedUSDCVault()
     await createWrappedETHVault()
 
@@ -194,8 +195,8 @@ transaction {
  * * @returns {Promise<string>} The transaction ID.
  */
 export const createWrappedUSDCVault = async () => {
-    // The complete Cadence transaction code as a string
-    const setupCadence = `
+  // The complete Cadence transaction code as a string
+  const setupCadence = `
         import FungibleToken from 0x9a0766d93b6608b7
         import WrappedUSDC1 from 0xe11cab85e85ae137
 
@@ -233,7 +234,46 @@ export const createWrappedUSDCVault = async () => {
         }
     `;
 
-    // The transaction takes no arguments.
-    // Call the utility function to execute the transaction.
-    return await executeTransaction(setupCadence, []);
+  // The transaction takes no arguments.
+  // Call the utility function to execute the transaction.
+  return await executeTransaction(setupCadence, []);
+}
+
+
+/**
+ * Sets up the user's account to receive WrappedUSDC1 tokens by creating 
+ * the storage vault and publishing the public Receiver capability.
+ * @returns {Promise<string>} The transaction ID.
+ */
+export const setupLiquidationPoolHandler = async () => {
+  // The complete Cadence transaction code as a string
+  const setupCadence = `
+    import LiquidationPoolTransactionHandler from 0xe11cab85e85ae137
+import FlowTransactionScheduler from 0x8c5303eaa26202d6
+
+transaction() {
+    prepare(signer: auth(BorrowValue, IssueStorageCapabilityController, SaveValue, PublishCapability) &Account) {
+        // Save a handler resource to storage if not already present
+        if signer.storage.borrow<&AnyResource>(from: /storage/LiquidationPoolTransactionHandler) == nil {
+            let handler <- LiquidationPoolTransactionHandler.createHandler()
+            signer.storage.save(<-handler, to: /storage/LiquidationPoolTransactionHandler)
+        }
+
+        // Validation/example that we can create an issue a handler capability with correct entitlement for FlowTransactionScheduler
+        let _ = signer.capabilities.storage
+            .issue<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.TransactionHandler}>(/storage/LiquidationPoolTransactionHandler)
+    
+        // Issue a non-entitled public capability for the handler that is publicly accessible
+        let publicCap = signer.capabilities.storage
+            .issue<&{FlowTransactionScheduler.TransactionHandler}>(/storage/LiquidationPoolTransactionHandler)
+        // publish the capability
+        signer.capabilities.publish(publicCap, at: /public/LiquidationPoolTransactionHandler)
+    }
+}
+       
+    `;
+
+  // The transaction takes no arguments.
+  // Call the utility function to execute the transaction.
+  return await executeTransaction(setupCadence, []);
 }

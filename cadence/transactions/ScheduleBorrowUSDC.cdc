@@ -65,10 +65,11 @@ transaction(
         let future = getCurrentBlock().timestamp + delaySeconds
         let priority = 1
 
-        let pr = priority == 1
+         let pr = priority == 0
             ? FlowTransactionScheduler.Priority.High
-            ? FlowTransactionScheduler.Priority.Medium
-            : FlowTransactionScheduler.Priority.Low
+            : priority == 1
+                ? FlowTransactionScheduler.Priority.Medium
+                : FlowTransactionScheduler.Priority.Low
 
         // Get the entitled capability that will be used to create the transaction
         // Need to check both controllers because the order of controllers is not guaranteed
