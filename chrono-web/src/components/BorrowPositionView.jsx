@@ -31,6 +31,8 @@ export default function BorrowPositionView({
   const [maxSupplyAmount, setMaxSupplyAmount] = useState(0)
   const [isLoadingSupply, setIsLoadingSupply] = useState(false)
   const [ethPrice, setEthPrice] = useState(0) // Store ETH price for USDC conversion
+  const [isBorrowing, setIsBorrowing] = useState(false)
+  const [txStatus, setTxStatus] = useState(null)
 
   const getTokenKeyFromSymbol = (symbol) => {
     const symbolMap = {
@@ -200,52 +202,43 @@ export default function BorrowPositionView({
 
     if (isNaN(collateralAmountFloat) || isNaN(borrowAmountFloat) || isNaN(duration)) {
       console.error('Invalid input: All amounts must be valid numbers')
-      alert('Please enter valid numbers for collateral, borrow amount, and duration')
+      setTxStatus({ type: 'error', message: 'Please enter valid numbers for collateral, borrow amount, and duration.' })
       return
     }
 
     if (collateralAmountFloat <= 0 || borrowAmountFloat <= 0 || duration <= 0) {
       console.error('Supply, Borrow amounts, and Duration must be greater than 0 to create a position.')
-      alert('All values must be greater than 0')
+      setTxStatus({ type: 'error', message: 'All values must be greater than 0.' })
       return
     }
 
     if (maxSupplyAmount > 0 && collateralAmountFloat > maxSupplyAmount) {
       console.error(`Collateral amount ${collateralAmountFloat} exceeds max supply ${maxSupplyAmount}`)
-      alert(`Collateral amount cannot exceed your supplied amount: ${maxSupplyAmount.toFixed(8)} ${asset.symbol}`)
+      setTxStatus({ type: 'error', message: `Collateral cannot exceed your supplied amount: ${maxSupplyAmount.toFixed(8)} ${asset.symbol}.` })
       return
     }
 
     // Check for UFix64 overflow (max value is 184467440737.09551615)
     const MAX_UFIX64 = 184467440737.09551615
     if (collateralAmountFloat > MAX_UFIX64) {
-      alert(`Collateral amount too large. Maximum: ${MAX_UFIX64}`)
+      setTxStatus({ type: 'error', message: `Collateral amount too large. Maximum: ${MAX_UFIX64}.` })
       return
     }
     if (borrowAmountFloat > MAX_UFIX64) {
-      alert(`Borrow amount too large. Maximum: ${MAX_UFIX64}`)
+      setTxStatus({ type: 'error', message: `Borrow amount too large. Maximum: ${MAX_UFIX64}.` })
       return
     }
 
     // Check for UInt64 overflow (max value is 18446744073709551615)
     const MAX_UINT64 = 18446744073709551615
     if (duration > MAX_UINT64) {
-      alert(`Duration too large. Maximum: ${MAX_UINT64} minutes`)
+      setTxStatus({ type: 'error', message: `Duration too large. Maximum: ${MAX_UINT64} minutes.` })
       return
     }
 
-    // The contract's LTV formula: a + b*2^(c*t) where c=-1, t=duration
-    // With c=-1, it calculates: 2^duration and converts to UFix64
-    // UFix64 max is ~184 billion, so 2^n must be < 184,467,440,737
-    // This means n <= 37, so duration <= 37 minutes for safety
-    const MAX_SAFE_MINUTES = 37 
-    if (duration > MAX_SAFE_MINUTES) {
-      alert(`Duration too large!\n\nYou entered: ${duration} minutes\n\nMaximum allowed: ${MAX_SAFE_MINUTES} minutes\n\nIMPORTANT: This is a temporary limit due to the contract's LTV formula (ltvFormulaC=-1).\nThe contract needs to be updated with a safer formula to allow longer durations.`)
-      return
-    }
     
     if (duration < 1) {
-      alert('Duration must be at least 1 minute')
+      setTxStatus({ type: 'error', message: 'Duration must be at least 1 minute.' })
       return
     }
 
@@ -261,18 +254,23 @@ export default function BorrowPositionView({
     })
 
     try {
+      setIsBorrowing(true)
+      setTxStatus(null)
       const txId = await createBorrowingPosition(
         collateralAmountFloat.toFixed(8), 
         borrowAmountFloat.toFixed(8),    
         duration.toString()               
       )
       console.log('Borrowing Transaction Sent. ID:', txId)
-      alert(`Success! Borrow position created. Transaction ID: ${txId}`)
-      // Handle success feedback here
+      setTxStatus({ type: 'success', txId, collateral: collateralAmountFloat, borrow: borrowAmountFloat, duration })
+      setBorrowAmount('')
+      setSupplyAmount('')
+      setTimeDays(0); setTimeHours(0); setTimeMinutes(0)
     } catch (error) {
       console.error('Failed to send Borrowing Transaction:', error)
-      alert(`Transaction failed: ${error.message}`)
-      // Handle error feedback here
+      setTxStatus({ type: 'error', message: error?.message ? `Transaction failed: ${error.message}` : 'Transaction failed. Please try again.' })
+    } finally {
+      setIsBorrowing(false)
     }
   }
 
@@ -489,6 +487,34 @@ export default function BorrowPositionView({
                 </button>
               </div>
 
+              {txStatus && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className={`mb-4 rounded-lg px-3 py-2 text-sm border overflow-hidden ${
+                    txStatus.type === 'success'
+                      ? 'bg-[#c5ff4a]/10 border-[#c5ff4a] text-[#c5ff4a]'
+                      : 'bg-red-900/20 border-red-700 text-red-300'
+                  }`}
+                >
+                  {txStatus.type === 'success' ? (
+                    <div>
+                      <div className="font-medium">Successfully created borrow position</div>
+                      <div className="mt-1 text-xs text-inherit">
+                        Collateral: <span className="font-mono">{(txStatus.collateral ?? 0).toFixed ? txStatus.collateral.toFixed(6) : txStatus.collateral}</span> {collateralSymbol}
+                        {' '}· Borrow: <span className="font-mono">{(txStatus.borrow ?? 0).toFixed ? txStatus.borrow.toFixed(6) : txStatus.borrow}</span> {borrowTokenSymbol}
+                        {' '}· Duration: <span className="font-mono">{txStatus.duration}</span> min
+                      </div>
+                      {txStatus.txId && (
+                        <div className="mt-1 text-xs text-inherit font-mono break-all">tx: {txStatus.txId}</div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="break-words">{txStatus.message}</div>
+                  )}
+                </div>
+              )}
+
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm text-gray-400">
@@ -606,60 +632,45 @@ export default function BorrowPositionView({
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm text-gray-400">Loan Duration</label>
-                  <span className="text-xs text-red-400 font-semibold">Max: 37 minutes</span>
-                </div>
-                <div className="bg-orange-900/20 border border-orange-700/50 rounded-lg p-3 mb-3">
-                  <p className="text-xs text-orange-300">
-                    <strong>Temporary Limitation:</strong> Due to the contract's current LTV formula, loans are limited to <strong>37 minutes maximum</strong>. 
-                    Longer durations cause arithmetic overflow. The contract needs to be updated with an improved formula.
-                  </p>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <input
                       type="number"
                       min="0"
-                      max="0"
                       value={timeDays}
-                      onChange={(e) => setTimeDays(0)}
+                      onChange={(e) => setTimeDays(Math.max(0, parseInt(e.target.value) || 0))}
                       placeholder="0"
-                      disabled
-                      className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-gray-600 text-center focus:outline-none cursor-not-allowed"
+                      className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white text-center focus:outline-none focus:border-neutral-600"
                     />
-                    <div className="text-xs text-gray-500 text-center mt-1">Days (disabled)</div>
+                    <div className="text-xs text-gray-500 text-center mt-1">Days</div>
                   </div>
                   <div>
                     <input
                       type="number"
                       min="0"
-                      max="0"
                       value={timeHours}
-                      onChange={(e) => setTimeHours(0)}
+                      onChange={(e) => setTimeHours(Math.max(0, parseInt(e.target.value) || 0))}
                       placeholder="0"
-                      disabled
-                      className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-gray-600 text-center focus:outline-none cursor-not-allowed"
+                      className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white text-center focus:outline-none focus:border-neutral-600"
                     />
-                    <div className="text-xs text-gray-500 text-center mt-1">Hours (disabled)</div>
+                    <div className="text-xs text-gray-500 text-center mt-1">Hours</div>
                   </div>
                   <div>
                     <input
                       type="number"
                       min="1"
-                      max="37"
                       value={timeMinutes}
-                      onChange={(e) => setTimeMinutes(Math.min(37, Math.max(1, parseInt(e.target.value) || 1)))}
-                      placeholder="1-37"
+                      onChange={(e) => setTimeMinutes(Math.max(1, parseInt(e.target.value) || 1))}
+                      placeholder="1+"
                       className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white text-center focus:outline-none focus:border-neutral-600"
                     />
-                    <div className="text-xs text-gray-500 text-center mt-1">Minutes (1-37)</div>
+                    <div className="text-xs text-gray-500 text-center mt-1">Minutes (≥ 1)</div>
                   </div>
                 </div>
-                <div className={`text-xs mt-2 ${totalMinutes > 37 ? 'text-red-400 font-semibold' : 'text-gray-400'}`}>
+                <div className={`text-xs mt-2 text-gray-400`}>
                   Total: {totalMinutes} minute{totalMinutes !== 1 ? 's' : ''}
-                  {totalMinutes > 37 && (
-                    <span className="ml-2">Exceeds 37 minute limit!</span>
-                  )}
-                  {totalMinutes > 0 && totalMinutes <= 37 && (
+                  {totalMinutes > 0 && (
                     <span className="ml-2 text-gray-500">
                       (Max LTV: {maxLTV.toFixed(2)}%, LT: {currentLT.toFixed(2)}%)
                     </span>

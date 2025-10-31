@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export default function Navbar({ 
   activeView, 
@@ -10,6 +10,24 @@ export default function Navbar({
   onDisconnect 
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isWalletDropdownOpen, setIsWalletDropdownOpen] = useState(false)
+  const walletDropdownRef = useRef(null)
+  
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (walletDropdownRef.current && !walletDropdownRef.current.contains(event.target)) {
+        setIsWalletDropdownOpen(false)
+      }
+    }
+    
+    if (isWalletDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isWalletDropdownOpen])
   
   const navItems = [
     { id: 'lend', label: 'Lend' },
@@ -63,21 +81,59 @@ export default function Navbar({
           {/* Desktop Wallet Actions */}
           {isWalletConnected ? (
             <motion.div 
-              className="hidden md:flex items-center gap-3"
+              className="hidden md:flex items-center gap-3 relative"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
             >
-              <div className="px-4 py-2 bg-neutral-800 border border-neutral-800 rounded-lg text-gray-300 text-sm font-medium">
-                {walletAddress}
+              <div className="relative" ref={walletDropdownRef}>
+                <button
+                  onClick={() => setIsWalletDropdownOpen(!isWalletDropdownOpen)}
+                  className="px-4 py-2 bg-neutral-800 border border-neutral-800 rounded-lg text-gray-300 text-sm font-medium hover:bg-neutral-700 transition-all duration-200 flex items-center gap-2"
+                >
+                  {walletAddress}
+                  <svg 
+                    className={`w-4 h-4 transition-transform ${isWalletDropdownOpen ? 'rotate-180' : ''}`} 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {isWalletDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute right-0 mt-2 w-56 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl z-50"
+                  >
+                    <div className="py-2">
+                      <div className="px-4 py-2 text-gray-300 text-sm border-b border-neutral-700">
+                        {walletAddress}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setActiveView('portfolio')
+                          setIsWalletDropdownOpen(false)
+                        }}
+                        className="w-full text-left px-4 py-2 text-gray-300 hover:bg-neutral-700 transition-colors text-sm"
+                      >
+                        Portfolio
+                      </button>
+                      <button
+                        onClick={() => {
+                          onDisconnect()
+                          setIsWalletDropdownOpen(false)
+                        }}
+                        className="w-full text-left px-4 py-2 text-gray-400 hover:bg-neutral-700 hover:text-white transition-colors text-sm"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
               </div>
-              <motion.button
-                onClick={onDisconnect}
-                className="px-4 py-2 bg-neutral-800 border border-neutral-800 rounded-lg text-gray-400 hover:bg-neutral-700 hover:text-white transition-all duration-200 text-sm font-medium"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Disconnect
-              </motion.button>
             </motion.div>
           ) : (
             <motion.button
@@ -142,6 +198,15 @@ export default function Navbar({
                   <div className="px-4 py-3 bg-neutral-800 rounded-lg text-gray-300 text-sm font-medium mt-2">
                     {walletAddress}
                   </div>
+                  <button
+                    onClick={() => {
+                      setActiveView('portfolio')
+                      setIsMobileMenuOpen(false)
+                    }}
+                    className="px-4 py-3 bg-neutral-800 rounded-lg text-gray-300 hover:text-white text-sm font-medium text-left"
+                  >
+                    Portfolio
+                  </button>
                   <button
                     onClick={() => {
                       onDisconnect()

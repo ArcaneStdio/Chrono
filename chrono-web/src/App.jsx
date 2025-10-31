@@ -5,6 +5,7 @@ import LendView from './components/LendView'
 import BorrowView from './components/BorrowView'
 import PoolsView from './components/PoolsView'
 import FaucetView from './components/FaucetView'
+import PortfolioView from './components/PortfolioView'
 import WalletModal from './components/WalletModal'
 import { connectWallet, disconnectWallet, configureFCL, subscribeToUser } from './utils/flowWallet'
 import { updateVaultDataFromBackend } from './utils/vaultData'
@@ -13,6 +14,7 @@ function App() {
   const [activeView, setActiveView] = useState('lend')
   const [isWalletConnected, setIsWalletConnected] = useState(false)
   const [walletAddress, setWalletAddress] = useState('')
+  const [fullWalletAddress, setFullWalletAddress] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
@@ -25,10 +27,12 @@ function App() {
     const unsubscribe = subscribeToUser((user) => {
       if (user && user.loggedIn && user.addr) {
         setIsWalletConnected(true)
+        setFullWalletAddress(user.addr)
         setWalletAddress(formatAddress(user.addr))
       } else {
         setIsWalletConnected(false)
         setWalletAddress('')
+        setFullWalletAddress('')
       }
     })
 
@@ -160,6 +164,21 @@ function App() {
                 isWalletConnected={isWalletConnected}
                 onConnect={handleConnectFlow}
                 userAddress={walletAddress}
+              />
+            </motion.div>
+          )}
+          {activeView === 'portfolio' && (
+            <motion.div
+              key="portfolio"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              <PortfolioView 
+                isWalletConnected={isWalletConnected}
+                onConnect={handleConnect}
+                userAddress={fullWalletAddress}
               />
             </motion.div>
           )}
