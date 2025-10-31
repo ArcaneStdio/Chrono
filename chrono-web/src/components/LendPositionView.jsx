@@ -47,7 +47,7 @@ export default function LendPositionView({
     try {
       setIsSupplying(true)
       setTxStatus(null)
-      const txId = await createLendingPosition(supplyAmount)
+      const txId = await createLendingPosition(supplyAmount, asset.symbol)
       setTxStatus({ type: 'success', amount, symbol: asset.symbol, txId })
       setSupplyAmount('')
       
