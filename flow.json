@@ -118,6 +118,10 @@
 				"type": "file",
 				"location": "weth.pkey"
 			}
+		},
+		"nawabBhosdika":{
+			"address": "2cac3bf278948170",
+			"key": "befbeebaf1cd0deb9f6a24d830e3ff701b91dda9ecb44482ca6194a3239532dd"
 		}
 	},
 	"deployments": {

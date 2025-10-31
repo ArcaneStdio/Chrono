@@ -152,7 +152,206 @@ access(all) contract LiquidationPool {
         }
         
         // Contribute ETH to pool
-        access(all) fun contributeETH(
+        
+        // Execute soft liquidation using pool funds (for positions with Flow/USDC debt)
+        access(all) fun executeSoftLiquidation(
+            positionId: UInt64,
+            liquidatorAddress: Address,
+            debtTokenType: String, // "FLOW" or "USDC"
+            oraclePayment: @{FungibleToken.Vault}
+        ) {
+            pre {
+                debtTokenType == "FLOW" || debtTokenType == "USDC": "Invalid debt token type"
+            }
+            
+            // Update cached prices
+            TimeLendingProtocol2.updateCachedPrice(symbol: "ETH", payment: <-oraclePayment)
+            
+            // Get position info
+            let position = TimeLendingProtocol2.getBorrowingPosition(id: positionId)
+                ?? panic("Position not found")
+            
+            assert(position.isActive, message: "Position is not active")
+            assert(position.healthFactor < 1.0, message: "Position is healthy, cannot liquidate")
+            
+            // Calculate required repayment
+            let ethPrice = TimeLendingProtocol2.getCachedPrice(symbol: "ETH") ?? 2000.0
+            let collateralValueUSD = position.collateralAmount * ethPrice
+            let targetHealthFactor: UFix64 = 1.1
+            let targetDebtUSD = (collateralValueUSD * position.liquidationThreshold) / targetHealthFactor
+            let currentDebtUSD = position.borrowAmount
+            let debtToRepay = currentDebtUSD - targetDebtUSD
+            
+            // Create repayment vault based on debt token type
+            var repaymentVault: @{FungibleToken.Vault}? <- nil
+            
+            if debtTokenType == "FLOW" {
+                assert(debtToRepay <= LiquidationPool.totalFlowLiquidity, 
+                    message: "Insufficient Flow liquidity. Required: ".concat(debtToRepay.toString()))
+                repaymentVault <-! LiquidationPool.flowVault.withdraw(amount: debtToRepay)
+                LiquidationPool.totalFlowLiquidity = LiquidationPool.totalFlowLiquidity - debtToRepay
+            } else if debtTokenType == "USDC" {
+                assert(debtToRepay <= LiquidationPool.totalUSDCLiquidity, 
+                    message: "Insufficient USDC liquidity. Required: ".concat(debtToRepay.toString()))
+                repaymentVault <-! LiquidationPool.usdcVault.withdraw(amount: debtToRepay)
+                LiquidationPool.totalUSDCLiquidity = LiquidationPool.totalUSDCLiquidity - debtToRepay
+            }
+            
+            // Get collateral recipient capability
+            let collateralRecipient = LiquidationPool.account.capabilities.get<&{FungibleToken.Receiver}>(/public/wrappedETH1Receiver)
+                .borrow() ?? panic("Could not borrow ETH receiver capability")
+            
+            // Execute soft liquidation
+            TimeLendingProtocol2.softLiquidatePosition(
+                positionId: positionId,
+                liquidator: liquidatorAddress,
+                repaymentVault: <-repaymentVault!,
+                liquidatorRecipient: collateralRecipient
+            )
+            
+            // Calculate collateral received
+            let discount = 1.0 - (position.calculatedLTV / position.liquidationThreshold)
+            let liquidationBonus = 1.0 + discount
+            let collateralValueLiquidated = debtToRepay * liquidationBonus
+            let collateralReceivedETH = collateralValueLiquidated / ethPrice
+            let profitInUSD = collateralValueLiquidated - debtToRepay
+            
+            emit LiquidationExecuted(
+                positionId: positionId,
+                liquidationType: "SoftLiquidation",
+                liquidator: liquidatorAddress,
+                collateralReceived: collateralReceivedETH,
+                collateralType: "ETH",
+                debtRepaid: debtToRepay,
+                profitGenerated: profitInUSD
+            )
+            
+            emit CollateralCollected(
+                tokenType: "ETH",
+                amount: collateralReceivedETH,
+                usdValue: collateralValueLiquidated
+            )
+        }
+        
+        // Execute hard liquidation for overdue position
+        
+        // Convert collected ETH collateral to Flow rewards
+        access(all) fun depositFlowRewardsFromETH(flowVault: @FlowToken.Vault, ethSold: UFix64) {
+            let flowAmount = flowVault.balance
+            LiquidationPool.flowVault.deposit(from: <-flowVault)
+            LiquidationPool.pendingFlowRewards = LiquidationPool.pendingFlowRewards + flowAmount
+            
+            emit RewardsConverted(tokensSold: "ETH", amountSold: ethSold, flowReceived: flowAmount)
+        }
+        
+        // Convert collected USDC collateral to Flow rewards
+        access(all) fun depositFlowRewardsFromUSDC(flowVault: @FlowToken.Vault, usdcSold: UFix64) {
+            let flowAmount = flowVault.balance
+            LiquidationPool.flowVault.deposit(from: <-flowVault)
+            LiquidationPool.pendingFlowRewards = LiquidationPool.pendingFlowRewards + flowAmount
+            
+            emit RewardsConverted(tokensSold: "USDC", amountSold: usdcSold, flowReceived: flowAmount)
+        }
+        
+        // Distribute pending Flow rewards to contributors
+        access(all) fun distributeRewards() {
+            pre {
+                LiquidationPool.pendingFlowRewards > 0.0: "No rewards to distribute"
+                LiquidationPool.totalShares > 0.0: "No contributors in pool"
+            }
+            
+            let rewardsToDistribute = LiquidationPool.pendingFlowRewards
+            
+            // Add rewards proportionally to each contributor's claimable amount
+            for address in LiquidationPool.contributors.keys {
+                let info = LiquidationPool.contributors[address]!
+                let shareRatio = info.shares / LiquidationPool.totalShares
+                let contributorFlowReward = shareRatio * rewardsToDistribute
+                LiquidationPool.contributors[address]!.addRewards(flowAmount: contributorFlowReward)
+            }
+            
+            emit RewardsDistributed(
+                totalFlowRewards: rewardsToDistribute,
+                totalShares: LiquidationPool.totalShares
+            )
+            
+            // Reset pending rewards
+            LiquidationPool.pendingFlowRewards = 0.0
+        }
+        
+        // Withdraw collected ETH collateral (for manual sale/swap)
+        access(all) fun withdrawCollateralETH(amount: UFix64, recipient: &{FungibleToken.Receiver}) {
+            pre {
+                amount <= LiquidationPool.collateralETHVault.balance: "Insufficient collateral ETH"
+            }
+            let ethVault <- LiquidationPool.collateralETHVault.withdraw(amount: amount)
+            recipient.deposit(from: <-ethVault)
+        }
+        
+        // Withdraw collected USDC collateral (for manual sale/swap)
+        access(all) fun withdrawCollateralUSDC(amount: UFix64, recipient: &{FungibleToken.Receiver}) {
+            pre {
+                amount <= LiquidationPool.collateralUSDCVault.balance: "Insufficient collateral USDC"
+            }
+            let usdcVault <- LiquidationPool.collateralUSDCVault.withdraw(amount: amount)
+            recipient.deposit(from: <-usdcVault)
+        }
+        
+        // Emergency function to move ETH collateral to main pool
+        access(all) fun moveETHCollateralToPool() {
+            let amount = LiquidationPool.collateralETHVault.balance
+            if amount > 0.0 {
+                let vault <- LiquidationPool.collateralETHVault.withdraw(amount: amount)
+                LiquidationPool.ethVault.deposit(from: <-vault)
+                LiquidationPool.totalETHLiquidity = LiquidationPool.totalETHLiquidity + amount
+            }
+        }
+        
+        // Emergency function to move USDC collateral to main pool
+        access(all) fun moveUSDCCollateralToPool() {
+            let amount = LiquidationPool.collateralUSDCVault.balance
+            if amount > 0.0 {
+                let vault <- LiquidationPool.collateralUSDCVault.withdraw(amount: amount)
+                LiquidationPool.usdcVault.deposit(from: <-vault)
+                LiquidationPool.totalUSDCLiquidity = LiquidationPool.totalUSDCLiquidity + amount
+            }
+        }
+    }
+    
+    // Public functions
+    access(all) fun createContributor(): @Contributor {
+        return <- create Contributor(address: self.account.address)
+    }
+    
+    access(all) fun getPoolStats(): {String: UFix64} {
+        return {
+            "totalShares": self.totalShares,
+            "totalETHLiquidity": self.totalETHLiquidity,
+            "totalUSDCLiquidity": self.totalUSDCLiquidity,
+            "totalFlowLiquidity": self.totalFlowLiquidity,
+            "pendingFlowRewards": self.pendingFlowRewards,
+            "collateralETHBalance": self.collateralETHVault.balance,
+            "collateralUSDCBalance": self.collateralUSDCVault.balance,
+            "contributorCount": UFix64(self.contributors.length)
+        }
+    }
+    
+    access(all) fun getContributorInfo(address: Address): ContributorInfo? {
+        return self.contributors[address]
+    }
+    
+    access(all) fun getAllContributors(): [Address] {
+        return self.contributors.keys
+    }
+    
+    access(all) fun getLiquidatablePositions(): {String: [UInt64]} {
+        return {
+            "unhealthy": TimeLendingProtocol2.getUnhealthyPositions(),
+            "overdue": TimeLendingProtocol2.getOverduePositions()
+        }
+    }
+
+    access(all) fun contributeETH(
             ethVault: @WrappedETH1.Vault,
             contributor: Address,
             oraclePayment: @{FungibleToken.Vault}
@@ -397,204 +596,6 @@ access(all) contract LiquidationPool {
                 flowAmount: flowAmount
             )
         }
-        
-        // Execute soft liquidation using pool funds (for positions with Flow/USDC debt)
-        access(all) fun executeSoftLiquidation(
-            positionId: UInt64,
-            liquidatorAddress: Address,
-            debtTokenType: String, // "FLOW" or "USDC"
-            oraclePayment: @{FungibleToken.Vault}
-        ) {
-            pre {
-                debtTokenType == "FLOW" || debtTokenType == "USDC": "Invalid debt token type"
-            }
-            
-            // Update cached prices
-            TimeLendingProtocol2.updateCachedPrice(symbol: "ETH", payment: <-oraclePayment)
-            
-            // Get position info
-            let position = TimeLendingProtocol2.getBorrowingPosition(id: positionId)
-                ?? panic("Position not found")
-            
-            assert(position.isActive, message: "Position is not active")
-            assert(position.healthFactor < 1.0, message: "Position is healthy, cannot liquidate")
-            
-            // Calculate required repayment
-            let ethPrice = TimeLendingProtocol2.getCachedPrice(symbol: "ETH") ?? 2000.0
-            let collateralValueUSD = position.collateralAmount * ethPrice
-            let targetHealthFactor: UFix64 = 1.1
-            let targetDebtUSD = (collateralValueUSD * position.liquidationThreshold) / targetHealthFactor
-            let currentDebtUSD = position.borrowAmount
-            let debtToRepay = currentDebtUSD - targetDebtUSD
-            
-            // Create repayment vault based on debt token type
-            var repaymentVault: @{FungibleToken.Vault}? <- nil
-            
-            if debtTokenType == "FLOW" {
-                assert(debtToRepay <= LiquidationPool.totalFlowLiquidity, 
-                    message: "Insufficient Flow liquidity. Required: ".concat(debtToRepay.toString()))
-                repaymentVault <-! LiquidationPool.flowVault.withdraw(amount: debtToRepay)
-                LiquidationPool.totalFlowLiquidity = LiquidationPool.totalFlowLiquidity - debtToRepay
-            } else if debtTokenType == "USDC" {
-                assert(debtToRepay <= LiquidationPool.totalUSDCLiquidity, 
-                    message: "Insufficient USDC liquidity. Required: ".concat(debtToRepay.toString()))
-                repaymentVault <-! LiquidationPool.usdcVault.withdraw(amount: debtToRepay)
-                LiquidationPool.totalUSDCLiquidity = LiquidationPool.totalUSDCLiquidity - debtToRepay
-            }
-            
-            // Get collateral recipient capability
-            let collateralRecipient = LiquidationPool.account.capabilities.get<&{FungibleToken.Receiver}>(/public/wrappedETH1Receiver)
-                .borrow() ?? panic("Could not borrow ETH receiver capability")
-            
-            // Execute soft liquidation
-            TimeLendingProtocol2.softLiquidatePosition(
-                positionId: positionId,
-                liquidator: liquidatorAddress,
-                repaymentVault: <-repaymentVault!,
-                liquidatorRecipient: collateralRecipient
-            )
-            
-            // Calculate collateral received
-            let discount = 1.0 - (position.calculatedLTV / position.liquidationThreshold)
-            let liquidationBonus = 1.0 + discount
-            let collateralValueLiquidated = debtToRepay * liquidationBonus
-            let collateralReceivedETH = collateralValueLiquidated / ethPrice
-            let profitInUSD = collateralValueLiquidated - debtToRepay
-            
-            emit LiquidationExecuted(
-                positionId: positionId,
-                liquidationType: "SoftLiquidation",
-                liquidator: liquidatorAddress,
-                collateralReceived: collateralReceivedETH,
-                collateralType: "ETH",
-                debtRepaid: debtToRepay,
-                profitGenerated: profitInUSD
-            )
-            
-            emit CollateralCollected(
-                tokenType: "ETH",
-                amount: collateralReceivedETH,
-                usdValue: collateralValueLiquidated
-            )
-        }
-        
-        // Execute hard liquidation for overdue position
-        
-        // Convert collected ETH collateral to Flow rewards
-        access(all) fun depositFlowRewardsFromETH(flowVault: @FlowToken.Vault, ethSold: UFix64) {
-            let flowAmount = flowVault.balance
-            LiquidationPool.flowVault.deposit(from: <-flowVault)
-            LiquidationPool.pendingFlowRewards = LiquidationPool.pendingFlowRewards + flowAmount
-            
-            emit RewardsConverted(tokensSold: "ETH", amountSold: ethSold, flowReceived: flowAmount)
-        }
-        
-        // Convert collected USDC collateral to Flow rewards
-        access(all) fun depositFlowRewardsFromUSDC(flowVault: @FlowToken.Vault, usdcSold: UFix64) {
-            let flowAmount = flowVault.balance
-            LiquidationPool.flowVault.deposit(from: <-flowVault)
-            LiquidationPool.pendingFlowRewards = LiquidationPool.pendingFlowRewards + flowAmount
-            
-            emit RewardsConverted(tokensSold: "USDC", amountSold: usdcSold, flowReceived: flowAmount)
-        }
-        
-        // Distribute pending Flow rewards to contributors
-        access(all) fun distributeRewards() {
-            pre {
-                LiquidationPool.pendingFlowRewards > 0.0: "No rewards to distribute"
-                LiquidationPool.totalShares > 0.0: "No contributors in pool"
-            }
-            
-            let rewardsToDistribute = LiquidationPool.pendingFlowRewards
-            
-            // Add rewards proportionally to each contributor's claimable amount
-            for address in LiquidationPool.contributors.keys {
-                let info = LiquidationPool.contributors[address]!
-                let shareRatio = info.shares / LiquidationPool.totalShares
-                let contributorFlowReward = shareRatio * rewardsToDistribute
-                LiquidationPool.contributors[address]!.addRewards(flowAmount: contributorFlowReward)
-            }
-            
-            emit RewardsDistributed(
-                totalFlowRewards: rewardsToDistribute,
-                totalShares: LiquidationPool.totalShares
-            )
-            
-            // Reset pending rewards
-            LiquidationPool.pendingFlowRewards = 0.0
-        }
-        
-        // Withdraw collected ETH collateral (for manual sale/swap)
-        access(all) fun withdrawCollateralETH(amount: UFix64, recipient: &{FungibleToken.Receiver}) {
-            pre {
-                amount <= LiquidationPool.collateralETHVault.balance: "Insufficient collateral ETH"
-            }
-            let ethVault <- LiquidationPool.collateralETHVault.withdraw(amount: amount)
-            recipient.deposit(from: <-ethVault)
-        }
-        
-        // Withdraw collected USDC collateral (for manual sale/swap)
-        access(all) fun withdrawCollateralUSDC(amount: UFix64, recipient: &{FungibleToken.Receiver}) {
-            pre {
-                amount <= LiquidationPool.collateralUSDCVault.balance: "Insufficient collateral USDC"
-            }
-            let usdcVault <- LiquidationPool.collateralUSDCVault.withdraw(amount: amount)
-            recipient.deposit(from: <-usdcVault)
-        }
-        
-        // Emergency function to move ETH collateral to main pool
-        access(all) fun moveETHCollateralToPool() {
-            let amount = LiquidationPool.collateralETHVault.balance
-            if amount > 0.0 {
-                let vault <- LiquidationPool.collateralETHVault.withdraw(amount: amount)
-                LiquidationPool.ethVault.deposit(from: <-vault)
-                LiquidationPool.totalETHLiquidity = LiquidationPool.totalETHLiquidity + amount
-            }
-        }
-        
-        // Emergency function to move USDC collateral to main pool
-        access(all) fun moveUSDCCollateralToPool() {
-            let amount = LiquidationPool.collateralUSDCVault.balance
-            if amount > 0.0 {
-                let vault <- LiquidationPool.collateralUSDCVault.withdraw(amount: amount)
-                LiquidationPool.usdcVault.deposit(from: <-vault)
-                LiquidationPool.totalUSDCLiquidity = LiquidationPool.totalUSDCLiquidity + amount
-            }
-        }
-    }
-    
-    // Public functions
-    access(all) fun createContributor(): @Contributor {
-        return <- create Contributor(address: self.account.address)
-    }
-    
-    access(all) fun getPoolStats(): {String: UFix64} {
-        return {
-            "totalShares": self.totalShares,
-            "totalETHLiquidity": self.totalETHLiquidity,
-            "totalUSDCLiquidity": self.totalUSDCLiquidity,
-            "totalFlowLiquidity": self.totalFlowLiquidity,
-            "pendingFlowRewards": self.pendingFlowRewards,
-            "collateralETHBalance": self.collateralETHVault.balance,
-            "collateralUSDCBalance": self.collateralUSDCVault.balance,
-            "contributorCount": UFix64(self.contributors.length)
-        }
-    }
-    
-    access(all) fun getContributorInfo(address: Address): ContributorInfo? {
-        return self.contributors[address]
-    }
-    
-    access(all) fun getAllContributors(): [Address] {
-        return self.contributors.keys
-    }
-    
-    access(all) fun getLiquidatablePositions(): {String: [UInt64]} {
-        return {
-            "unhealthy": TimeLendingProtocol2.getUnhealthyPositions(),
-            "overdue": TimeLendingProtocol2.getOverduePositions()
-        }
-    }
 
     access(all) fun executeHardLiquidation(
             positionId: UInt64,
