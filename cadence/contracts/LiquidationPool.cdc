@@ -89,7 +89,6 @@ access(all) contract LiquidationPool {
     access(self) var flowVault: @FlowToken.Vault
     access(self) var ethVault: @WrappedETH1.Vault
     access(self) var usdcVault: @WrappedUSDC1.Vault
-    access(self) var oracleVault: @FlowToken.Vault
     
     // Collateral vaults (holds liquidated collateral before conversion to Flow)
     access(self) var collateralETHVault: @WrappedETH1.Vault
@@ -140,7 +139,7 @@ access(all) contract LiquidationPool {
             emit RewardsClaimed(contributor: self.address, flowAmount: claimableAmount)
         }
     }
-    
+
     // Pool Admin resource
     access(all) resource PoolAdmin {
         
@@ -479,100 +478,7 @@ access(all) contract LiquidationPool {
             )
         }
         
-        // Execute hard liquidation for overdue positions
-        access(all) fun executeHardLiquidation(
-            positionId: UInt64,
-            debtTokenType: String
-        ) {
-            pre {
-                debtTokenType == "FLOW" || debtTokenType == "USDC" || debtTokenType == "ETH": "Invalid debt token type"
-            }
-
-            // Get the oracle payment vault
-            let oracleVault = LiquidationPool.oracleVault
-            let oraclePayment <- oracleVault.withdraw(amount: BandOracle.getFee())
-
-            // Update cached prices
-            TimeLendingProtocol2.updateCachedPrice(symbol: "ETH", payment: <-oraclePayment)
-            
-            // Get position info
-            let position = TimeLendingProtocol2.getBorrowingPosition(id: positionId)
-                ?? panic("Position not found")
-            
-            assert(position.isActive, message: "Position is not active")
-            assert(position.isOverdue(), message: "Position is not overdue")
-            
-            // Calculate total debt with interest
-            let timeElapsed = getCurrentBlock().timestamp - position.timestamp
-            let baseInterestRate = 0.05  // 5% annual
-            let interest = position.borrowAmount * baseInterestRate * timeElapsed / 31536000.0
-            let totalDebt = position.borrowAmount + interest
-            
-            // Create repayment vault based on debt token type
-            var repaymentVault: @{FungibleToken.Vault}? <- nil
-            
-            if debtTokenType == "FLOW" {
-                assert(totalDebt <= LiquidationPool.totalFlowLiquidity,
-                    message: "Insufficient Flow liquidity. Required: ".concat(totalDebt.toString()))
-                repaymentVault <-! LiquidationPool.flowVault.withdraw(amount: totalDebt)
-                LiquidationPool.totalFlowLiquidity = LiquidationPool.totalFlowLiquidity - totalDebt
-            } else if debtTokenType == "USDC" {
-                assert(totalDebt <= LiquidationPool.totalUSDCLiquidity,
-                    message: "Insufficient USDC liquidity. Required: ".concat(totalDebt.toString()))
-                repaymentVault <-! LiquidationPool.usdcVault.withdraw(amount: totalDebt)
-                LiquidationPool.totalUSDCLiquidity = LiquidationPool.totalUSDCLiquidity - totalDebt
-            } else {
-                assert(totalDebt <= LiquidationPool.totalETHLiquidity,
-                    message: "Insufficient ETH liquidity. Required: ".concat(totalDebt.toString()))
-                repaymentVault <-! LiquidationPool.ethVault.withdraw(amount: totalDebt)
-                LiquidationPool.totalETHLiquidity = LiquidationPool.totalETHLiquidity - totalDebt
-            }
-
-            let collateralType = TimeLendingProtocol2.getBorrowingPosition(id: positionId)?.collateralType ?? panic("Could not get collateral type")
-
-            var collateralRecipient: &{FungibleToken.Receiver} = nil
-
-            if collateralType.toString().contains("ETH") {
-                collateralRecipient = LiquidationPool.account.capabilities.get<&{FungibleToken.Receiver}>(WrappedETH1.ReceiverPublicPath)
-                .borrow() ?? panic("Could not borrow ETH receiver capability")
-            } else if collateralType.toString().contains("USDC") {
-                collateralRecipient = LiquidationPool.account.capabilities.get<&{FungibleToken.Receiver}>(WrappedUSDC1.ReceiverPublicPath)
-                .borrow() ?? panic("Could not borrow USDC receiver capability")
-            } else if collateralType.toString().contains("FLOW") {
-                collateralRecipient = LiquidationPool.account.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
-                .borrow() ?? panic("Could not borrow Flow receiver capability") 
-            } else {
-                panic("Unsupported collateral type")
-            }
-            // Execute hard liquidation
-            TimeLendingProtocol2.hardLiquidateOverduePosition(
-                positionId: positionId,
-                liquidator: self.account.address,
-                repaymentVault: <-repaymentVault!,
-                liquidatorRecipient: collateralRecipient
-            )
-            
-            // Calculate profit
-            let ethPrice = TimeLendingProtocol2.getCachedPrice(symbol: "ETH") ?? 2000.0
-            let collateralValueUSD = position.collateralAmount * ethPrice
-            let profitInUSD = collateralValueUSD - totalDebt
-            
-            emit LiquidationExecuted(
-                positionId: positionId,
-                liquidationType: "HardLiquidation",
-                liquidator: liquidatorAddress,
-                collateralReceived: position.collateralAmount,
-                collateralType: collateralType,
-                debtRepaid: totalDebt,
-                profitGenerated: profitInUSD
-            )
-            
-            emit CollateralCollected(
-                tokenType: "ETH",
-                amount: position.collateralAmount,
-                usdValue: collateralValueUSD
-            )
-        }
+        // Execute hard liquidation for overdue position
         
         // Convert collected ETH collateral to Flow rewards
         access(all) fun depositFlowRewardsFromETH(flowVault: @FlowToken.Vault, ethSold: UFix64) {
@@ -689,6 +595,98 @@ access(all) contract LiquidationPool {
             "overdue": TimeLendingProtocol2.getOverduePositions()
         }
     }
+
+    access(all) fun executeHardLiquidation(
+            positionId: UInt64,
+            debtTokenType: String,
+        ) {
+            pre {
+                debtTokenType == "FLOW" || debtTokenType == "USDC" || debtTokenType == "ETH": "Invalid debt token type"
+            }
+
+            let oraclePayment <- LiquidationPool.flowVault.withdraw(amount: BandOracle.getFee())
+
+            // Update cached prices
+            TimeLendingProtocol2.updateCachedPrice(symbol: "ETH", payment: <-oraclePayment)
+            
+            // Get position info
+            let position = TimeLendingProtocol2.getBorrowingPosition(id: positionId)
+                ?? panic("Position not found")
+            
+            assert(position.isActive, message: "Position is not active")
+            
+            // Calculate total debt with interest
+            let timeElapsed = getCurrentBlock().timestamp - position.timestamp
+            let baseInterestRate = 0.05  // 5% annual
+            let interest = position.borrowAmount * baseInterestRate * timeElapsed / 31536000.0
+            let totalDebt = position.borrowAmount + interest
+            
+            // Create repayment vault based on debt token type
+            var repaymentVault: @{FungibleToken.Vault}? <- nil
+            
+            if debtTokenType == "FLOW" {
+                assert(totalDebt <= LiquidationPool.totalFlowLiquidity,
+                    message: "Insufficient Flow liquidity. Required: ".concat(totalDebt.toString()))
+                repaymentVault <-! LiquidationPool.flowVault.withdraw(amount: totalDebt)
+                LiquidationPool.totalFlowLiquidity = LiquidationPool.totalFlowLiquidity - totalDebt
+            } else if debtTokenType == "USDC" {
+                assert(totalDebt <= LiquidationPool.totalUSDCLiquidity,
+                    message: "Insufficient USDC liquidity. Required: ".concat(totalDebt.toString()))
+                repaymentVault <-! LiquidationPool.usdcVault.withdraw(amount: totalDebt)
+                LiquidationPool.totalUSDCLiquidity = LiquidationPool.totalUSDCLiquidity - totalDebt
+            } else {
+                assert(totalDebt <= LiquidationPool.totalETHLiquidity,
+                    message: "Insufficient ETH liquidity. Required: ".concat(totalDebt.toString()))
+                repaymentVault <-! LiquidationPool.ethVault.withdraw(amount: totalDebt)
+                LiquidationPool.totalETHLiquidity = LiquidationPool.totalETHLiquidity - totalDebt
+            }
+
+            let collateralType = TimeLendingProtocol2.getBorrowingPosition(id: positionId)?.collateralType ?? panic("Could not get collateral type")
+
+            var collateralRecipient: &{FungibleToken.Receiver} = LiquidationPool.account.capabilities.get<&{FungibleToken.Receiver}>(WrappedETH1.ReceiverPublicPath)
+                .borrow() ?? panic("Could not borrow ETH receiver capability")
+
+            if collateralType.identifier.contains("ETH") {
+                collateralRecipient = LiquidationPool.account.capabilities.get<&{FungibleToken.Receiver}>(WrappedETH1.ReceiverPublicPath)
+                .borrow() ?? panic("Could not borrow ETH receiver capability")
+            } else if collateralType.identifier.contains("USDC") {
+                collateralRecipient = LiquidationPool.account.capabilities.get<&{FungibleToken.Receiver}>(WrappedUSDC1.ReceiverPublicPath)
+                .borrow() ?? panic("Could not borrow USDC receiver capability")
+            } else if collateralType.identifier.contains("FLOW") {
+                collateralRecipient = LiquidationPool.account.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+                .borrow() ?? panic("Could not borrow Flow receiver capability") 
+            } else {
+                panic("Unsupported collateral type")
+            }
+            // Execute hard liquidation
+            TimeLendingProtocol2.hardLiquidateOverduePosition(
+                positionId: positionId,
+                liquidator: self.account.address,
+                repaymentVault: <-repaymentVault!,
+                liquidatorRecipient: collateralRecipient
+            )
+            
+            // Calculate profit
+            let ethPrice = TimeLendingProtocol2.getCachedPrice(symbol: "ETH") ?? 2000.0
+            let collateralValueUSD = position.collateralAmount * ethPrice
+            let profitInUSD = collateralValueUSD - totalDebt
+            
+            emit LiquidationExecuted(
+                positionId: positionId,
+                liquidationType: "HardLiquidation",
+                liquidator: self.account.address,
+                collateralReceived: position.collateralAmount,
+                collateralType: collateralType.identifier,
+                debtRepaid: totalDebt,
+                profitGenerated: profitInUSD
+            )
+            
+            emit CollateralCollected(
+                tokenType: "ETH",
+                amount: position.collateralAmount,
+                usdValue: collateralValueUSD
+            )
+        }
     
     init() {
         // Initialize storage paths
@@ -708,9 +706,7 @@ access(all) contract LiquidationPool {
         // Create empty vaults
         self.flowVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>()) as! @FlowToken.Vault
         self.ethVault <- WrappedETH1.createEmptyVault(vaultType: Type<@WrappedETH1.Vault>())
-        self.usdcVault <- WrappedUSDC1.createEmptyVault(vaultType: Type<@WrappedUSDC1.Vault>())
-        self.oracleVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>()) as! @FlowToken.Vault
-        
+        self.usdcVault <- WrappedUSDC1.createEmptyVault(vaultType: Type<@WrappedUSDC1.Vault>())        
         // Create collateral vaults
         self.collateralETHVault <- WrappedETH1.createEmptyVault(vaultType: Type<@WrappedETH1.Vault>())
         self.collateralUSDCVault <- WrappedUSDC1.createEmptyVault(vaultType: Type<@WrappedUSDC1.Vault>())

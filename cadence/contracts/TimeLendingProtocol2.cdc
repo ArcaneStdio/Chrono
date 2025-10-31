@@ -354,7 +354,6 @@ access(all) contract TimeLendingProtocol2 {
         pre {
             self.borrowingPositions[positionId] != nil: "Position does not exist"
             self.borrowingPositions[positionId]!.isActive: "Position is not active"
-            self.borrowingPositions[positionId]!.isOverdue(): "Position is not overdue yet"
         }
         
         let position = self.borrowingPositions[positionId]!
