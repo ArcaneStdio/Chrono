@@ -290,15 +290,6 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                       }}
                       onClick={() => setSelectedBorrowPosition(position)}
                     >
-                      {(() => {
-                        const nowSec = Math.floor(Date.now() / 1000)
-                        const ts = position.timestamp ? parseFloat(position.timestamp) : 0
-                        const durMin = position.durationMinutes ? parseFloat(position.durationMinutes) : 0
-                        const deadline = position.repaymentDeadline ? parseFloat(position.repaymentDeadline) : (ts && durMin ? ts + durMin * 60 : 0)
-                        const isOverdue = deadline > 0 && nowSec > deadline
-                        const timeLeftMin = deadline > 0 ? Math.max(0, Math.floor((deadline - nowSec) / 60)) : null
-                        return (
-                          <>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-white font-semibold text-xs">
@@ -321,8 +312,8 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                         </div>
                       </td>
                       <td className="p-4">
-                        <div className={`font-medium ${isOverdue ? 'text-red-400' : 'text-gray-300'}`}>
-                          {deadline ? (isOverdue ? 'Expired' : `${timeLeftMin} min left`) : (position.durationMinutes ? `${position.durationMinutes} min` : '—')}
+                        <div className="text-gray-300 font-medium">
+                          {position.durationMinutes ? `${position.durationMinutes} min` : '—'}
                         </div>
                       </td>
                       <td className="p-4">
@@ -346,18 +337,15 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                       <td className="p-4">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
                           position.isActive 
-                            ? (isOverdue ? 'bg-red-900/30 text-red-400 border border-red-700/50' : 'bg-green-900/30 text-green-400 border border-green-700/50') 
+                            ? 'bg-green-900/30 text-green-400 border border-green-700/50'
                             : 'bg-gray-900/30 text-gray-400 border border-gray-700/50'
                         }`}>
-                          {position.isActive ? (isOverdue ? 'Overdue' : 'Active') : 'Inactive'}
+                          {position.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td className="p-4">
-                        <div className={`text-sm ${isOverdue ? 'text-red-400' : 'text-gray-400'}`}>{formatTimestamp(position.timestamp)}</div>
+                        <div className="text-sm text-gray-400">{formatTimestamp(position.timestamp)}</div>
                       </td>
-                          </>
-                        )
-                      })()}
                     </motion.tr>
                   ))
                 ) : (

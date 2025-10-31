@@ -18,18 +18,8 @@ export default function BorrowPositionDetailsView({
   const [repayTxStatus, setRepayTxStatus] = useState(null)
   const [borrowMoreTxStatus, setBorrowMoreTxStatus] = useState(null)
 
-  // Calculate time remaining and status
-  const nowSec = Math.floor(Date.now() / 1000)
-  const ts = position.timestamp ? parseFloat(position.timestamp) : 0
-  const durMin = position.durationMinutes ? parseFloat(position.durationMinutes) : 0
-  const deadline = position.repaymentDeadline ? parseFloat(position.repaymentDeadline) : (ts && durMin ? ts + durMin * 60 : 0)
-  const isOverdue = deadline > 0 && nowSec > deadline
-  const timeLeftMin = deadline > 0 ? Math.max(0, Math.floor((deadline - nowSec) / 60)) : null
-  const timeLeftHours = timeLeftMin !== null ? Math.floor(timeLeftMin / 60) : null
-  const timeLeftDays = timeLeftHours !== null ? Math.floor(timeLeftHours / 24) : null
-
   const handleRepay = async () => {
-    if (!position.isActive || isOverdue) return
+    if (!position.isActive) return
     try {
       setIsRepaying(true)
       setRepayTxStatus(null)
@@ -52,7 +42,7 @@ export default function BorrowPositionDetailsView({
   const handleBorrowMore = async () => {
     const amount = parseFloat(additionalBorrowAmount)
     if (!amount || amount <= 0) return
-    if (!position.isActive || isOverdue) return
+    if (!position.isActive) return
     
     try {
       setIsBorrowingMore(true)
@@ -169,10 +159,10 @@ export default function BorrowPositionDetailsView({
                   <div className="text-xs text-gray-500 mb-2">Status</div>
                   <span className={`px-2 py-1 rounded text-xs font-medium ${
                     position.isActive 
-                      ? (isOverdue ? 'bg-red-900/30 text-red-400 border border-red-700/50' : 'bg-green-900/30 text-green-400 border border-green-700/50') 
+                      ? 'bg-green-900/30 text-green-400 border border-green-700/50'
                       : 'bg-gray-900/30 text-gray-400 border border-gray-700/50'
                   }`}>
-                    {position.isActive ? (isOverdue ? 'Overdue' : 'Active') : 'Inactive'}
+                    {position.isActive ? 'Active' : 'Inactive'}
                   </span>
                 </div>
                 <div>
@@ -182,17 +172,9 @@ export default function BorrowPositionDetailsView({
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-500 mb-2">Time Remaining</div>
-                  <div className={`text-lg font-semibold ${isOverdue ? 'text-red-400' : 'text-white'}`}>
-                    {timeLeftMin !== null 
-                      ? isOverdue 
-                        ? 'Expired' 
-                        : timeLeftDays > 0
-                          ? `${timeLeftDays}d ${timeLeftHours % 24}h`
-                          : timeLeftHours > 0
-                            ? `${timeLeftHours}h ${timeLeftMin % 60}m`
-                            : `${timeLeftMin}m`
-                      : '—'}
+                  <div className="text-xs text-gray-500 mb-2">Repayment Deadline</div>
+                  <div className="text-lg font-semibold text-white">
+                    {position.repaymentDeadline ? formatTimestamp(position.repaymentDeadline) : '—'}
                   </div>
                 </div>
                 <div>
@@ -276,10 +258,10 @@ export default function BorrowPositionDetailsView({
               {isWalletConnected ? (
                 <button
                   onClick={handleRepay}
-                  disabled={isRepaying || !position.isActive || isOverdue}
+                  disabled={isRepaying || !position.isActive}
                   aria-busy={isRepaying ? 'true' : 'false'}
                   className={`w-full font-semibold py-3 rounded-lg transition-colors ${
-                    isRepaying || !position.isActive || isOverdue
+                    isRepaying || !position.isActive
                       ? 'bg-neutral-700 text-gray-500 cursor-not-allowed'
                       : 'bg-[#c5ff4a] hover:bg-[#b0e641] text-neutral-900'
                   }`}
@@ -348,7 +330,7 @@ export default function BorrowPositionDetailsView({
                   onChange={(e) => setAdditionalBorrowAmount(e.target.value)}
                   placeholder="0"
                   className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-4 text-white text-2xl font-bold focus:outline-none focus:border-neutral-600"
-                  disabled={!isWalletConnected || !position.isActive || isOverdue}
+                  disabled={!isWalletConnected || !position.isActive}
                 />
                 <div className="text-xs text-gray-500 mt-2">
                   Additional {position.borrowTokenType || 'tokens'} to borrow
@@ -371,10 +353,10 @@ export default function BorrowPositionDetailsView({
               {isWalletConnected ? (
                 <button
                   onClick={handleBorrowMore}
-                  disabled={isBorrowingMore || !additionalBorrowAmount || parseFloat(additionalBorrowAmount) <= 0 || !position.isActive || isOverdue}
+                  disabled={isBorrowingMore || !additionalBorrowAmount || parseFloat(additionalBorrowAmount) <= 0 || !position.isActive}
                   aria-busy={isBorrowingMore ? 'true' : 'false'}
                   className={`w-full font-semibold py-3 rounded-lg transition-colors ${
-                    isBorrowingMore || !additionalBorrowAmount || parseFloat(additionalBorrowAmount) <= 0 || !position.isActive || isOverdue
+                    isBorrowingMore || !additionalBorrowAmount || parseFloat(additionalBorrowAmount) <= 0 || !position.isActive
                       ? 'bg-neutral-700 text-gray-500 cursor-not-allowed'
                       : 'bg-[#c5ff4a] hover:bg-[#b0e641] text-neutral-900'
                   }`}

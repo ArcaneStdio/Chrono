@@ -1,14 +1,12 @@
-import "FlowTransactionScheduler"
-import "FlowTransactionSchedulerUtils"
-import "FlowToken"
-import "FungibleToken"
+import FlowTransactionScheduler from 0x8c5303eaa26202d6
+import FlowTransactionSchedulerUtils from 0x8c5303eaa26202d6
+import FungibleToken from 0x9a0766d93b6608b7
+import FlowToken from 0x7e60df042a9c0868
 import LiquidationPoolTransactionHandler from 0xe11cab85e85ae137
 
 /// Schedule an increment of the Counter with a relative delay in seconds using the manager
 transaction(
     delaySeconds: UFix64,
-    priority: UInt8,
-    executionEffort: UInt64,
     collateralAmount: UFix64,      // Amount of Wrapped ETH to use as collateral
     borrowAmount: UFix64,
 ) {
@@ -65,11 +63,10 @@ transaction(
 
         let future = getCurrentBlock().timestamp + delaySeconds
 
-        let pr = priority == 0
+        let pr = priority == 1
             ? FlowTransactionScheduler.Priority.High
-            : priority == 1
-                ? FlowTransactionScheduler.Priority.Medium
-                : FlowTransactionScheduler.Priority.Low
+            ? FlowTransactionScheduler.Priority.Medium
+            : FlowTransactionScheduler.Priority.Low
 
         // Get the entitled capability that will be used to create the transaction
         // Need to check both controllers because the order of controllers is not guaranteed
@@ -106,7 +103,7 @@ transaction(
             data: transactionData,
             timestamp: future,
             priority: pr,
-            executionEffort: executionEffort
+            executionEffort: 1000
         )
 
         assert(
@@ -122,7 +119,7 @@ transaction(
             data: transactionData,
             timestamp: future,
             priority: pr,
-            executionEffort: executionEffort,
+            executionEffort: 1000,
             fees: <-fees
         )
 

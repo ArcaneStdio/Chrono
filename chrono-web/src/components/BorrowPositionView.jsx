@@ -65,8 +65,18 @@ export default function BorrowPositionView({
     return 'USDC' 
   }
 
-  const collateralSymbol = getCollateralToken()
-  const borrowTokenSymbol = getBorrowToken()
+  const collateralSymbol = getCollateralToken() || 'WETH'
+  const borrowTokenSymbol = getBorrowToken() || 'USDC'
+
+  if (!asset) {
+    return (
+      <div className="min-h-screen bg-neutral-950 pt-4 md:pt-8 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-400">Loading asset data...</p>
+        </div>
+      </div>
+    )
+  }
 
   useEffect(() => {
     const fetchVaultData = async () => {
@@ -415,10 +425,10 @@ export default function BorrowPositionView({
           <div className="flex items-center gap-3 mb-4">
             <div className="flex items-center flex-shrink-0">
               <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-neutral-800 border-2 border-neutral-950 flex items-center justify-center text-white font-semibold text-sm md:text-base">
-                {collateralSymbol.substring(0, 2)}
+                {(collateralSymbol || 'WETH').substring(0, 2)}
               </div>
               <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-neutral-800 border-2 border-neutral-950 flex items-center justify-center -ml-3 md:-ml-4 text-white font-semibold text-sm md:text-base">
-                {borrowTokenSymbol.substring(0, 2)}
+                {(borrowTokenSymbol || 'USDC').substring(0, 2)}
               </div>
             </div>
             <div>
@@ -633,11 +643,15 @@ export default function BorrowPositionView({
                     ) : maxSupplyAmount > 0 ? (
                       <>
                         <span>Max available: {maxSupplyAmount.toFixed(8)} {collateralSymbol}</span>
-                        {(asset.symbol === 'WETH' || asset.symbol === 'ETH') && ethPrice > 0 && (
-                          <span className="text-gray-400">
-                            ≈ {(maxSupplyAmount * ethPrice).toFixed(2)} USDC value
-                          </span>
-                        )}
+                        {(() => {
+                          const collateralPriceKey = collateralSymbol === 'WETH' ? 'WETH' : collateralSymbol
+                          const collateralPrice = prices[collateralPriceKey] || 0
+                          return collateralPrice > 0 && (
+                            <span className="text-gray-400">
+                              ≈ ${(maxSupplyAmount * collateralPrice).toFixed(2)} USD value
+                            </span>
+                          )
+                        })()}
                       </>
                     ) : isWalletConnected ? (
                       <span>No {collateralSymbol} supplied</span>

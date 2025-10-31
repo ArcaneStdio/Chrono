@@ -179,48 +179,42 @@ export default function BorrowView({
                 </tr>
               </thead>
               <tbody>
-                {userPositions.map((p, idx) => {
-                  const nowSec = Math.floor(Date.now() / 1000)
-                  const ts = p.timestamp ? parseFloat(p.timestamp) : 0
-                  const durMin = p.durationMinutes ? parseFloat(p.durationMinutes) : 0
-                  const deadline = p.repaymentDeadline ? parseFloat(p.repaymentDeadline) : (ts && durMin ? ts + durMin * 60 : 0)
-                  const isOverdue = deadline > 0 && nowSec > deadline
-                  const timeLeftMin = deadline > 0 ? Math.max(0, Math.floor((deadline - nowSec) / 60)) : null
-                  return (
-                    <tr key={idx} className="border-b border-neutral-700/50">
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-white font-semibold text-xs">
-                            {p.collateralType?.substring(0, 2) || '—'}
-                          </div>
-                          <div>
-                            <div className="text-white font-medium">{formatTokenAmount(p.collateralAmount)}</div>
-                            <div className="text-gray-400 text-xs">{p.collateralType}</div>
-                          </div>
+                {userPositions.map((p, idx) => (
+                  <tr key={idx} className="border-b border-neutral-700/50">
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-white font-semibold text-xs">
+                          {p.collateralType?.substring(0, 2) || '—'}
                         </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-white font-medium">{formatTokenAmount(p.borrowAmount)}</div>
-                        <div className="text-gray-400 text-xs">{p.borrowTokenType}</div>
-                      </td>
-                      <td className="p-4">
-                        <div className={`font-medium ${isOverdue ? 'text-red-400' : 'text-gray-300'}`}>
-                          {deadline ? (isOverdue ? 'Expired' : `${timeLeftMin} min left`) : (p.durationMinutes ? `${p.durationMinutes} min` : '—')}
+                        <div>
+                          <div className="text-white font-medium">{formatTokenAmount(p.collateralAmount)}</div>
+                          <div className="text-gray-400 text-xs">{p.collateralType}</div>
                         </div>
-                      </td>
-                      <td className="p-4">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          isOverdue ? 'bg-red-900/30 text-red-400 border border-red-700/50' : 'bg-green-900/30 text-green-400 border border-green-700/50'
-                        }`}>
-                          {isOverdue ? 'Overdue' : 'Active'}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <div className={`text-sm ${isOverdue ? 'text-red-400' : 'text-gray-400'}`}>{formatTimestamp(p.timestamp)}</div>
-                      </td>
-                    </tr>
-                  )
-                })}
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="text-white font-medium">{formatTokenAmount(p.borrowAmount)}</div>
+                      <div className="text-gray-400 text-xs">{p.borrowTokenType}</div>
+                    </td>
+                    <td className="p-4">
+                      <div className="text-gray-300 font-medium">
+                        {p.durationMinutes ? `${p.durationMinutes} min` : '—'}
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        p.isActive 
+                          ? 'bg-green-900/30 text-green-400 border border-green-700/50'
+                          : 'bg-gray-900/30 text-gray-400 border border-gray-700/50'
+                      }`}>
+                        {p.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="text-sm text-gray-400">{formatTimestamp(p.timestamp)}</div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
