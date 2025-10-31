@@ -15,7 +15,6 @@ import * as fcl from '@onflow/fcl'
 export default function BorrowPositionView({
   asset,
   onBack,
-  // New Props for Wallet Connection
   isWalletConnected,
   onConnect,
   userAddress

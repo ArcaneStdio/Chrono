@@ -53,8 +53,10 @@ export const createLendingPosition = async (amount, tokenSymbol) => {
       transaction(amount: UFix64) {
           let lenderVault: @WrappedUSDC1.Vault
           let lendingManagerRef: &TimeLendingProtocol2.LendingManager
+          let signer: Address
           
           prepare(signer: auth(BorrowValue, Storage) &Account) {
+              self.signer = signer.address
               let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &WrappedUSDC1.Vault>(
                   from: WrappedUSDC1.VaultStoragePath
               ) ?? panic("Could not borrow reference to the USDC vault")
@@ -66,7 +68,7 @@ export const createLendingPosition = async (amount, tokenSymbol) => {
           execute {
               let positionId = self.lendingManagerRef.createLendingPosition(
                   tokenVault: <-self.lenderVault,
-                  lender: self.lendingManagerRef.owner!.address
+                  lender: self.signer
               )
               
               log("Lending position created with ID: ".concat(positionId.toString()))
@@ -82,8 +84,10 @@ export const createLendingPosition = async (amount, tokenSymbol) => {
       transaction(amount: UFix64) {
           let lenderVault: @FlowToken.Vault
           let lendingManagerRef: &TimeLendingProtocol2.LendingManager
+          let signer: Address
           
           prepare(signer: auth(BorrowValue, Storage) &Account) {
+          self.signer = signer.address
               let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
                   from: /storage/flowTokenVault
               ) ?? panic("Could not borrow reference to the FLOW vault")
@@ -95,7 +99,7 @@ export const createLendingPosition = async (amount, tokenSymbol) => {
           execute {
               let positionId = self.lendingManagerRef.createLendingPosition(
                   tokenVault: <-self.lenderVault,
-                  lender: self.lendingManagerRef.owner!.address
+                  lender: self.signer
               )
               
               log("Lending position created with ID: ".concat(positionId.toString()))

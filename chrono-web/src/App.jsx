@@ -141,7 +141,11 @@ function App() {
               animate="animate"
               exit="exit"
             >
-              <PoolsView />
+              <PoolsView 
+                isWalletConnected={isWalletConnected}
+                onConnect={handleConnectFlow}
+                userAddress={walletAddress}
+              />
             </motion.div>
           )}
           {activeView === 'faucet' && (
