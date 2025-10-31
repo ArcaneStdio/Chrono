@@ -13,14 +13,18 @@ import FlowToken from 0x7e60df042a9c0868
 // This returns your deposited tokens plus any earned interest back to your wallet
 
 transaction(positionId: UInt64) {
+    
     let lendingManagerRef: &TimeLendingProtocol2.LendingManager
     let recipient: &{FungibleToken.Receiver}
     let position: TimeLendingProtocol2.LendingPosition
+    let borrowAuth: auth(Storage) &Account
     
     prepare(signer: auth(BorrowValue, Storage, Capabilities) &Account) {
         // Get the lending position to check details
         self.position = TimeLendingProtocol2.getLendingPosition(id: positionId)
             ?? panic("Lending position does not exist")
+
+        self.borrowAuth = signer
         
         // Verify the signer is the lender
         if self.position.lender != signer.address {
@@ -37,17 +41,49 @@ transaction(positionId: UInt64) {
         // Determine which token type was lent
         let tokenType = self.position.tokenType
         
-        // Receiving USDC back (adjust if you support more tokens)
-        self.recipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
-            WrappedUSDC1.ReceiverPublicPath
-        ).borrow() ?? panic("Could not borrow WrappedUSDC receiver capability. Make sure you have WrappedUSDC1 vault set up.")
+        log("Lending Position Details:")
+        log("  Position ID: ".concat(positionId.toString()))
+        log("  Lender: ".concat(self.position.lender.toString()))
+        log("  Amount: ".concat(self.position.amount.toString()))
+        log("  Token Type: ".concat(tokenType.identifier))
+        log("  Timestamp: ".concat(self.position.timestamp.toString()))
+        
+        if tokenType.toString().contains("WrappedUSDC1.Vault") {
+            // Get recipient capability for WrappedUSDC1
+            self.recipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
+                WrappedUSDC1.ReceiverPublicPath
+            ).borrow() ?? panic("Could not borrow WrappedUSDC receiver capability")
+        } else if tokenType.toString().contains("Flow") {
+            // Get recipient capability for FlowToken
+            self.recipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
+                /public/flowTokenReceiver
+            ).borrow() ?? panic("Could not borrow FLOW receiver capability")
+        } else {
+            self.recipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
+                WrappedETH1.ReceiverPublicPath
+            ).borrow() ?? panic("Could not borrow WrappedETH receiver capability")
+        }
+            
+        
+        // Calculate time elapsed
+        let timeElapsed = getCurrentBlock().timestamp - self.position.timestamp
+        let daysElapsed = timeElapsed / 86400.0
+        log("  Time Elapsed: ".concat(daysElapsed.toString()).concat(" days"))
     }
     
     execute {
+        // Withdraw the lending position
         self.lendingManagerRef.withdrawLending(
             positionId: positionId,
-            recipient: self.recipient
+            recipient: self.recipient,
+            borrowerAuth: self.borrowAuth
         )
+        
+        log("")
+        log("✅ Successfully withdrawn lending position!")
+        log("  Amount Withdrawn: ".concat(self.position.amount.toString()))
+        log("  Position Closed: #".concat(positionId.toString()))
+        log("  Tokens returned to your wallet")
     }
 }
 `
@@ -58,6 +94,7 @@ export async function withdrawLending(positionId) {
     fcl.arg(String(positionId), fcl.t.UInt64)
   ])
 }
+
 
 
 

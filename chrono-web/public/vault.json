@@ -1,11 +1,11 @@
 {
-  "timestamp": "2025-10-31T13:55:43.557Z",
-  "lastUpdate": 1761918943557,
+  "timestamp": "2025-10-31T14:15:16.357Z",
+  "lastUpdate": 1761920116357,
   "protocolStats": {
     "totalValueLocked": 2144227.859063798,
-    "totalBorrowed": 24967.47135,
+    "totalBorrowed": 24964.57135,
     "activeLendingPositions": 28,
-    "activeBorrowingPositions": 10,
+    "activeBorrowingPositions": 9,
     "unhealthyPositions": 0,
     "overduePositions": 8
   },
@@ -29,16 +29,16 @@
     {
       "tokenType": "WrappedUSDC",
       "totalDeposited": 26566,
-      "totalBorrowed": 24967.47135,
-      "availableLiquidity": 1598.52865,
-      "utilizationRate": 93.982802,
-      "numberOfActiveBorrowPositions": 10,
+      "totalBorrowed": 24964.57135,
+      "availableLiquidity": 1601.42865,
+      "utilizationRate": 93.971886,
+      "numberOfActiveBorrowPositions": 9,
       "numberOfActiveLendingPositions": 7,
       "price": 1,
       "lastPriceUpdate": 1761435955,
       "totalDepositedUSD": 26566,
-      "totalBorrowedUSD": 24967.47135,
-      "availableLiquidityUSD": 1598.52865,
+      "totalBorrowedUSD": 24964.57135,
+      "availableLiquidityUSD": 1601.42865,
       "symbol": "USDC",
       "name": "USDC"
     },

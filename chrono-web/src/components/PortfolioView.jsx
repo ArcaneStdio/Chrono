@@ -7,6 +7,7 @@ import {
   formatTimestamp
 } from '../utils/portfolioData'
 import { withdrawLending } from '../utils/withdraw-lending'
+import { repayLoan } from '../utils/repay-loan'
 
 export default function PortfolioView({ userAddress, isWalletConnected, onConnect }) {
   const [activeTab, setActiveTab] = useState('lending')
@@ -14,6 +15,7 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
   const [borrowingPositions, setBorrowingPositions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [withdrawingId, setWithdrawingId] = useState(null)
+  const [repayingId, setRepayingId] = useState(null)
 
   useEffect(() => {
     if (isWalletConnected && userAddress) {
@@ -238,7 +240,7 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
           transition={{ duration: 0.3 }}
         >
           <div className="bg-neutral-800/30 border border-neutral-700 rounded-xl overflow-x-auto">
-            <table className="w-full min-w-[1020px]">
+            <table className="w-full min-w-[1120px]">
               <thead>
                 <tr className="border-b border-neutral-700">
                   <th className="text-left p-4 text-gray-400 font-medium text-sm">Collateral</th>
@@ -248,14 +250,15 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                   <th className="text-left p-4 text-gray-400 font-medium text-sm">Health Factor</th>
                   <th className="text-left p-4 text-gray-400 font-medium text-sm">Status</th>
                   <th className="text-left p-4 text-gray-400 font-medium text-sm">Timestamp</th>
+                  <th className="text-left p-4 text-gray-400 font-medium text-sm">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <>
-                    <SkeletonRow colSpan={7} />
-                    <SkeletonRow colSpan={7} />
-                    <SkeletonRow colSpan={7} />
+                    <SkeletonRow colSpan={8} />
+                    <SkeletonRow colSpan={8} />
+                    <SkeletonRow colSpan={8} />
                   </>
                 ) : borrowingPositions.length > 0 ? (
                   borrowingPositions.map((position, index) => (
@@ -270,6 +273,15 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                         ease: [0.4, 0, 0.2, 1]
                       }}
                     >
+                      {(() => {
+                        const nowSec = Math.floor(Date.now() / 1000)
+                        const ts = position.timestamp ? parseFloat(position.timestamp) : 0
+                        const durMin = position.durationMinutes ? parseFloat(position.durationMinutes) : 0
+                        const deadline = position.repaymentDeadline ? parseFloat(position.repaymentDeadline) : (ts && durMin ? ts + durMin * 60 : 0)
+                        const isOverdue = deadline > 0 && nowSec > deadline
+                        const timeLeftMin = deadline > 0 ? Math.max(0, Math.floor((deadline - nowSec) / 60)) : null
+                        return (
+                          <>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-white font-semibold text-xs">
@@ -292,8 +304,8 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                         </div>
                       </td>
                       <td className="p-4">
-                        <div className="text-white font-medium">
-                          {position.durationMinutes ? `${position.durationMinutes} min` : '—'}
+                        <div className={`font-medium ${isOverdue ? 'text-red-400' : 'text-gray-300'}`}>
+                          {deadline ? (isOverdue ? 'Expired' : `${timeLeftMin} min left`) : (position.durationMinutes ? `${position.durationMinutes} min` : '—')}
                         </div>
                       </td>
                       <td className="p-4">
@@ -317,22 +329,47 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                       <td className="p-4">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
                           position.isActive 
-                            ? 'bg-green-900/30 text-green-400 border border-green-700/50' 
+                            ? (isOverdue ? 'bg-red-900/30 text-red-400 border border-red-700/50' : 'bg-green-900/30 text-green-400 border border-green-700/50') 
                             : 'bg-gray-900/30 text-gray-400 border border-gray-700/50'
                         }`}>
-                          {position.isActive ? 'Active' : 'Inactive'}
+                          {position.isActive ? (isOverdue ? 'Overdue' : 'Active') : 'Inactive'}
                         </span>
                       </td>
                       <td className="p-4">
-                        <div className="text-gray-400 text-sm">
-                          {formatTimestamp(position.timestamp)}
-                        </div>
+                        <div className={`text-sm ${isOverdue ? 'text-red-400' : 'text-gray-400'}`}>{formatTimestamp(position.timestamp)}</div>
                       </td>
+                      <td className="p-4">
+                        <button
+                          disabled={!position.isActive || isOverdue || repayingId === position.id}
+                          onClick={async () => {
+                            try {
+                              setRepayingId(position.id)
+                              await repayLoan(position.id)
+                              await loadPositions()
+                            } catch (e) {
+                              console.error('Repay failed', e)
+                              alert('Repay failed. See console for details.')
+                            } finally {
+                              setRepayingId(null)
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded text-sm font-medium transition-colors border ${
+                            !position.isActive || isOverdue || repayingId === position.id
+                              ? 'bg-neutral-800 border-neutral-700 text-gray-500 cursor-not-allowed'
+                              : 'bg-neutral-800 border-neutral-700 text-gray-300 hover:bg-neutral-700 hover:text-white'
+                          }`}
+                        >
+                          {repayingId === position.id ? 'Repaying...' : 'Repay'}
+                        </button>
+                      </td>
+                          </>
+                        )
+                      })()}
                     </motion.tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="7" className="p-8 text-center text-gray-500">
+                    <td colSpan="8" className="p-8 text-center text-gray-500">
                       No borrowed positions found
                     </td>
                   </tr>
