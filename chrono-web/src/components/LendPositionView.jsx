@@ -8,21 +8,27 @@ export default function LendPositionView({
   onBack,
   isWalletConnected,
   onConnect,
-  userAddress
+  userAddress,
+  onSupplySuccess
 }) {
   const [supplyAmount, setSupplyAmount] = useState('')
+  const [isSupplying, setIsSupplying] = useState(false)
+  const [txStatus, setTxStatus] = useState(null) 
+  const utilizationPct = parseFloat((asset.utilization || '').toString()) || 0
+  const radius = 16
+  const circumference = 2 * Math.PI * radius
 
   const vaultData = {
     totalSupply: asset.totalSupply || 'not coming',
-    totalSupplyTokens: asset.totalSupplyTokens || 'not coming',
+    totalSupplyTokens: asset.totalSupplyToken || '—',
     supplyAPY: asset.supplyAPY || 'not coming',
     utilization: asset.utilization || 'not coming',
     totalBorrowed: asset.totalBorrowed || 'not coming',
-    availableLiquidity: asset.available || 'not coming',
+    availableLiquidity: asset.availableLiquidity || '—',
     borrowAPY: asset.borrowAPY || 'not coming',
-    oraclePrice: asset.oraclePrice || 'not coming',
+    oraclePrice: asset.price || '—',
     market: asset.protocol || 'not coming',
-    vaultType: asset.vaultType || 'not coming',
+    vaultType: asset.vaultType || 'Isolated',
     canBeBorrowed: asset.canBeBorrowed || 'not coming',
     canBeUsedAsCollateral: asset.canBeUsedAsCollateral || 'not coming',
     liquidationPenalty: asset.liquidationPenalty || 'not coming',
@@ -36,14 +42,26 @@ export default function LendPositionView({
   }
 
   const handleSupply = async () => {
-    if (parseFloat(supplyAmount) > 0) {
-      try {
-        const txId = await createLendingPosition(supplyAmount)
-        console.log('Lending Transaction Sent. ID:', txId)
-        setSupplyAmount('')
-      } catch (error) {
-        console.error('Failed to send Lending Transaction:', error)
+    const amount = parseFloat(supplyAmount)
+    if (!amount || amount <= 0) return
+    try {
+      setIsSupplying(true)
+      setTxStatus(null)
+      const txId = await createLendingPosition(supplyAmount, asset.symbol)
+      setTxStatus({ type: 'success', amount, symbol: asset.symbol, txId })
+      setSupplyAmount('')
+      
+      if (onSupplySuccess) {
+        console.log('🔄 Refreshing vault data after successful supply...')
+        await onSupplySuccess()
       }
+    } catch (error) {
+      setTxStatus({
+        type: 'error',
+        message: error?.message ? `Supply failed: ${error.message}` : 'Supply failed. Please try again.'
+      })
+    } finally {
+      setIsSupplying(false)
     }
   }
 
@@ -97,7 +115,29 @@ export default function LendPositionView({
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Utilization</div>
               <div className="flex items-center gap-2 md:gap-3">
-                <div className="w-8 h-8 md:w-12 md:h-12 rounded-full border-3 md:border-4 border-[#c5ff4a] border-t-transparent rotate-45"></div>
+                <div className="w-8 h-8 md:w-12 md:h-12">
+                  <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r={radius}
+                      fill="none"
+                      className="stroke-neutral-800"
+                      strokeWidth="4"
+                    />
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r={radius}
+                      fill="none"
+                      className="stroke-[#c5ff4a]"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={(1 - utilizationPct / 100) * circumference}
+                    />
+                  </svg>
+                </div>
                 <div className="text-lg md:text-3xl font-bold text-white">{vaultData.utilization}</div>
               </div>
             </div>
@@ -172,6 +212,31 @@ export default function LendPositionView({
                 Supply {asset.symbol}
               </h3>
 
+              {txStatus && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className={`mb-4 rounded-lg px-3 py-2 text-sm border overflow-hidden ${
+                    txStatus.type === 'success'
+                      ? 'bg-[#c5ff4a]/10 border-[#c5ff4a] text-[#c5ff4a]'
+                      : 'bg-red-900/20 border-red-700 text-red-300'
+                  }`}
+                >
+                  {txStatus.type === 'success' ? (
+                    <div>
+                      <div className="font-medium">Successfully supplied {txStatus.amount} {txStatus.symbol}</div>
+                      {txStatus.txId && (
+                        <div className="mt-1 text-xs text-inherit font-mono break-all">
+                          tx: {txStatus.txId}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="break-words">{txStatus.message}</div>
+                  )}
+                </div>
+              )}
+
               {isWalletConnected && (
                 <div className="flex justify-between items-center text-xs mb-3">
                   <span className="text-gray-500">Connected Wallet</span>
@@ -204,14 +269,23 @@ export default function LendPositionView({
               {isWalletConnected ? (
                 <button
                   onClick={handleSupply}
-                  disabled={!supplyAmount || parseFloat(supplyAmount) <= 0}
+                  disabled={isSupplying || !supplyAmount || parseFloat(supplyAmount) <= 0}
+                  aria-busy={isSupplying ? 'true' : 'false'}
+                  aria-live="polite"
                   className={`w-full font-semibold py-3 rounded-lg transition-colors ${
-                    !supplyAmount || parseFloat(supplyAmount) <= 0
+                    isSupplying || !supplyAmount || parseFloat(supplyAmount) <= 0
                       ? 'bg-neutral-700 text-gray-500 cursor-not-allowed'
                       : 'bg-[#c5ff4a] hover:bg-[#b0e641] text-neutral-900'
                   }`}
                 >
-                  Supply
+                  {isSupplying ? (
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <span className="inline-block w-4 h-4 rounded-full border-2 border-[#c5ff4a] border-t-transparent animate-spin"></span>
+                      Supplying…
+                    </span>
+                  ) : (
+                    'Supply'
+                  )}
                 </button>
               ) : (
                 <button

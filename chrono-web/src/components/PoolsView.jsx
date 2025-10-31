@@ -6,7 +6,7 @@ import {
   ListIcon 
 } from './Icons'
 
-export default function PoolsView() {
+export default function PoolsView({ isWalletConnected, onConnect, userAddress }) {
   const [activeTab, setActiveTab] = useState('pools')
   const [viewMode, setViewMode] = useState('grid')
   const [isLoading, setIsLoading] = useState(true)
@@ -329,6 +329,11 @@ export default function PoolsView() {
                 }`}>
                   {pool.roe7d}
                 </div>
+              </div>
+              <div>
+                <button className="w-full mt-4 md:mt-0 px-4 py-2 bg-[#c5ff4a] hover:bg-[#b0e641] text-neutral-900 font-semibold rounded-lg transition-colors">
+                  Add Liquidity
+                </button>
               </div>
             </div>
           </motion.div>

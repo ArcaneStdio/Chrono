@@ -14,7 +14,8 @@ export default function Navbar({
   const navItems = [
     { id: 'lend', label: 'Lend' },
     { id: 'borrow', label: 'Borrow' },
-    { id: 'pools', label: 'Pools' }
+    { id: 'pools', label: 'Pools' },
+    { id: 'faucet', label: 'Faucet' }
   ]
 
   const handleNavClick = (id) => {
