@@ -154,7 +154,7 @@ export default function LendView({ isWalletConnected, onConnect, userAddress }) 
             {isLoading ? (
               <div className="h-6 md:h-8 w-24 md:w-32 bg-neutral-700 rounded animate-shimmer mb-1"></div>
             ) : (
-              <p className="text-xl md:text-2xl font-semibold text-gray-300">$ {totalBorrow}</p>
+              <p className="text-xl md:text-2xl font-semibold text-gray-300"> {totalBorrow}</p>
             )}
             <p className="text-xs text-gray-500 hidden md:block">{totalBorrowUSD}</p>
           </motion.div>
@@ -168,7 +168,7 @@ export default function LendView({ isWalletConnected, onConnect, userAddress }) 
             {isLoading ? (
               <div className="h-6 md:h-8 w-24 md:w-32 bg-neutral-700 rounded animate-shimmer mb-1"></div>
             ) : (
-              <p className="text-xl md:text-2xl font-semibold text-gray-300">$ {totalSupply}</p>
+              <p className="text-xl md:text-2xl font-semibold text-gray-300"> {totalSupply}</p>
             )}
             <p className="text-xs text-gray-500 hidden md:block">{totalSupplyUSD}</p>
           </motion.div>
