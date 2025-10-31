@@ -31,12 +31,14 @@ transaction(positionId: UInt64) {
         log("  Lender: ".concat(self.position.lender.toString()))
         log("  Amount: ".concat(self.position.amount.toString()))
         log("  Token Type: ".concat(tokenType))
+        log("  Token Type: ".concat(tokenType))
         log("  Timestamp: ".concat(self.position.timestamp.toString()))
         if tokenType.contains("USDC") {
             // Get recipient capability for WrappedUSDC1
             self.recipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
                 WrappedUSDC1.ReceiverPublicPath
             ).borrow() ?? panic("Could not borrow WrappedUSDC receiver capability")
+        } else if tokenType.contains("Flow") {
         } else if tokenType.contains("Flow") {
             // Get recipient capability for FlowToken
             self.recipient = signer.capabilities.get<&{FungibleToken.Receiver}>(

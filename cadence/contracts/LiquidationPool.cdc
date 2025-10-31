@@ -4,6 +4,7 @@ import WrappedETH1 from 0xe11cab85e85ae137
 import WrappedUSDC1 from 0xe11cab85e85ae137
 import Oracle from 0xa6729879755d30b1
 import TimeLendingProtocol2 from 0xe11cab85e85ae137
+import BandOracle from 0x9fb6606c300b5051
 
 access(all) contract LiquidationPool {
     
@@ -88,6 +89,7 @@ access(all) contract LiquidationPool {
     access(self) var flowVault: @FlowToken.Vault
     access(self) var ethVault: @WrappedETH1.Vault
     access(self) var usdcVault: @WrappedUSDC1.Vault
+    access(self) var oracleVault: @FlowToken.Vault
     
     // Collateral vaults (holds liquidated collateral before conversion to Flow)
     access(self) var collateralETHVault: @WrappedETH1.Vault
@@ -480,14 +482,16 @@ access(all) contract LiquidationPool {
         // Execute hard liquidation for overdue positions
         access(all) fun executeHardLiquidation(
             positionId: UInt64,
-            liquidatorAddress: Address,
-            debtTokenType: String, // "FLOW" or "USDC"
-            oraclePayment: @{FungibleToken.Vault}
+            debtTokenType: String
         ) {
             pre {
                 debtTokenType == "FLOW" || debtTokenType == "USDC" || debtTokenType == "ETH": "Invalid debt token type"
             }
-            
+
+            // Get the oracle payment vault
+            let oracleVault = LiquidationPool.oracleVault
+            let oraclePayment <- oracleVault.withdraw(amount: BandOracle.getFee())
+
             // Update cached prices
             TimeLendingProtocol2.updateCachedPrice(symbol: "ETH", payment: <-oraclePayment)
             
@@ -543,7 +547,7 @@ access(all) contract LiquidationPool {
             // Execute hard liquidation
             TimeLendingProtocol2.hardLiquidateOverduePosition(
                 positionId: positionId,
-                liquidator: liquidatorAddress,
+                liquidator: self.account.address,
                 repaymentVault: <-repaymentVault!,
                 liquidatorRecipient: collateralRecipient
             )
@@ -705,6 +709,7 @@ access(all) contract LiquidationPool {
         self.flowVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>()) as! @FlowToken.Vault
         self.ethVault <- WrappedETH1.createEmptyVault(vaultType: Type<@WrappedETH1.Vault>())
         self.usdcVault <- WrappedUSDC1.createEmptyVault(vaultType: Type<@WrappedUSDC1.Vault>())
+        self.oracleVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>()) as! @FlowToken.Vault
         
         // Create collateral vaults
         self.collateralETHVault <- WrappedETH1.createEmptyVault(vaultType: Type<@WrappedETH1.Vault>())
