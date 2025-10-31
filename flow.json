@@ -96,7 +96,7 @@
 			"address": "e11cab85e85ae137",
 			"key": {
 				"type": "file",
-				"location": "testnet.pkey"
+				"location": "raptor.pkey"
 			}
 		},
 		"testnet2": {

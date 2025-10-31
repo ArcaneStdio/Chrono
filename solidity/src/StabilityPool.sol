@@ -14,7 +14,6 @@ pragma solidity ^0.8.19;
   - totalRaw stores raw units; raw -> effective uses P.
   - All math uses RAY = 1e18 fixed point.
 */
-
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -104,7 +103,7 @@ contract StabilityPool is ReentrancyGuard, Ownable {
         Depositor storage d = depositors[user];
         uint256 deltaC = C - d.collateralSnapshot; // scaled by RAY
         uint256 gain = (d.raw * deltaC) / RAY; // collateral units
-        return d.pendingCollateral + gain;
+        return d.pendingCollateral + gain;      
     }
 
     // --- User actions ---
