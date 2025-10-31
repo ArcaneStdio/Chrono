@@ -1,5 +1,5 @@
-import "FlowTransactionScheduler"
-import "LiquidationPool"
+import FlowTransactionScheduler from 0x8c5303eaa26202d6
+import LiquidationPool from 0xe11cab85e85ae137
 
 access(all) contract LiquidationPoolTransactionHandler {
 

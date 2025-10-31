@@ -41,6 +41,12 @@
 			"aliases": {
 				"testing": "179b6b1cb6755e31"
 			}
+		},
+		"hardLiquidationTransactionHandler": {
+			"source": "cadence/contracts/hardLiquidationTransactionHandler.cdc",
+			"aliases": {
+				"testnet": "e11cab85e85ae137"
+			}
 		}
 	},
 	"networks": {
@@ -123,7 +129,9 @@
 		},
 		"testnet": {
 			"testnet": [
-				"LiquidationPool"
+				"hardLiquidationTransactionHandler",
+				"LiquidationPool",
+				"TimeLendingProtocol2"
 			]
 		}
 	}
