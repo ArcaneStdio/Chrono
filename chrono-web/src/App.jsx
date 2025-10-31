@@ -133,7 +133,7 @@ function App() {
               <BorrowView 
                 isWalletConnected={isWalletConnected} 
                 onConnect={handleConnect} 
-                userAddress={walletAddress} 
+                userAddress={fullWalletAddress} 
               />
             </motion.div>
           )}

@@ -24,7 +24,9 @@ export default function LendPositionView({
     supplyAPY: asset.supplyAPY || 'not coming',
     utilization: asset.utilization || 'not coming',
     totalBorrowed: asset.totalBorrowed || 'not coming',
+    totalBorrowedToken: asset.totalBorrowedToken || '—',
     availableLiquidity: asset.availableLiquidity || '—',
+    availableLiquidityToken: asset.availableLiquidityToken || '—',
     borrowAPY: asset.borrowAPY || 'not coming',
     oraclePrice: asset.price || '—',
     market: asset.protocol || 'not coming',
@@ -180,10 +182,12 @@ export default function LendPositionView({
                 <div>
                   <div className="text-xs text-gray-500 mb-2">Total borrowed</div>
                   <div className="text-xl font-bold text-white">{vaultData.totalBorrowed}</div>
+                  <div className="text-sm text-gray-400 mt-1">{vaultData.totalBorrowedToken}</div>
                 </div>
                 <div>
                   <div className="text-xs text-gray-500 mb-2">Available liquidity</div>
                   <div className="text-xl font-bold text-white">{vaultData.availableLiquidity}</div>
+                  <div className="text-sm text-gray-400 mt-1">{vaultData.availableLiquidityToken}</div>
                 </div>
                 <div>
                   <div className="text-xs text-gray-500 mb-2">Borrow APY</div>

@@ -5,59 +5,71 @@ import {
   GridIcon,
   ListIcon
 } from './Icons'
+import { fetchPoolData } from '../utils/poolData'
+import PoolDetailView from './PoolDetailView'
 
 export default function PoolsView({ isWalletConnected, onConnect, userAddress }) {
   const [activeTab, setActiveTab] = useState('pools')
   const [viewMode, setViewMode] = useState('grid')
   const [isLoading, setIsLoading] = useState(true)
+  const [poolData, setPoolData] = useState(null)
+  const [showDetail, setShowDetail] = useState(false)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    setIsLoading(true)
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 700)
-    return () => clearTimeout(timer)
+    let mounted = true
+    async function load() {
+      try {
+        setIsLoading(true)
+        setError(null)
+        const data = await fetchPoolData()
+        if (mounted) {
+          setPoolData(data?.data || data)
+        }
+      } catch (e) {
+        console.error('Failed to load pool data', e)
+        if (mounted) {
+          setError(e.message || 'Failed to load pool data')
+        }
+      } finally {
+        if (mounted) setIsLoading(false)
+      }
+    }
+    load()
+    return () => { mounted = false }
   }, [])
 
-  const swapVolume = "444.34M"
-  const availableLiquidity = "14.28M"
+  const formatNumber = (value) => {
+    if (!value && value !== 0) return '—'
+    const num = typeof value === 'string' ? parseFloat(value) : value
+    if (isNaN(num)) return '—'
+    if (num >= 1000000) return `$${(num / 1000000).toFixed(2)}M`
+    if (num >= 1000) return `$${(num / 1000).toFixed(2)}K`
+    return num.toFixed(2)
+  }
 
-  const pools = [
+  const totalLiquidity = poolData ? 
+    (parseFloat(poolData.totalUSDCLiquidity || 0) + 
+     parseFloat(poolData.totalETHLiquidity || 0) + 
+     parseFloat(poolData.totalFlowLiquidity || 0)) : 0
+
+  const pools = poolData ? [
     {
-      protocol: 'Euler Prime',
-      baseAsset: 'USDC',
-      quoteAsset: 'USDT',
-      baseIcon: '',
-      quoteIcon: '',
-      lpNav: '$2.06M',
-      volume24h: '$126.97M',
-      currentPrice: '1.000157',
-      pricePair: 'USDC/USDT',
-      lpPnl: '-$24.17K',
-      lpPnlPercent: '-$10.4K 24h',
-      roe7d: '-15.22%',
-      swapOperator: '0x4fD5...68a8',
-      createdAt: 'Aug 29, 2025',
-      isNegativePnl: true
-    },
-    {
-      protocol: 'Euler Yield',
-      baseAsset: 'RLUSD',
-      quoteAsset: 'USDT',
-      baseIcon: '',
-      quoteIcon: '',
-      lpNav: '$1.85M',
-      volume24h: '$89.45M',
-      currentPrice: '1.000089',
-      pricePair: 'RLUSD/USDT',
-      lpPnl: '+$18.92K',
-      lpPnlPercent: '+$8.2K 24h',
-      roe7d: '+12.45%',
-      swapOperator: '0xF87A...a8A8',
-      createdAt: 'Aug 12, 2025',
-      isNegativePnl: false
+      ...poolData
     }
-  ]
+  ] : []
+
+  if (showDetail && poolData) {
+    return (
+      <PoolDetailView
+        pool={poolData}
+        onBack={() => setShowDetail(false)}
+        isWalletConnected={isWalletConnected}
+        onConnect={onConnect}
+        userAddress={userAddress}
+      />
+    )
+  }
 
   const SkeletonPool = () => (
     <div className="bg-neutral-800/30 border border-neutral-700 rounded-xl p-6">
@@ -113,11 +125,11 @@ export default function PoolsView({ isWalletConnected, onConnect, userAddress })
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: 0.1 }}
           >
-            <p className="text-gray-500 text-xs mb-1">7d swap volume</p>
+            <p className="text-gray-500 text-xs mb-1">Total Shares</p>
             {isLoading ? (
               <div className="h-6 md:h-8 w-24 md:w-32 bg-neutral-700 rounded animate-shimmer"></div>
             ) : (
-              <p className="text-xl md:text-2xl font-semibold text-gray-300">$ {swapVolume}</p>
+              <p className="text-xl md:text-2xl font-semibold text-gray-300">{poolData?.totalShares || '—'}</p>
             )}
           </motion.div>
           <motion.div
@@ -126,11 +138,11 @@ export default function PoolsView({ isWalletConnected, onConnect, userAddress })
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: 0.2 }}
           >
-            <p className="text-gray-500 text-xs mb-1">Available liquidity</p>
+            <p className="text-gray-500 text-xs mb-1">Total Contributors</p>
             {isLoading ? (
               <div className="h-6 md:h-8 w-24 md:w-32 bg-neutral-700 rounded animate-shimmer"></div>
             ) : (
-              <p className="text-xl md:text-2xl font-semibold text-gray-300">$ {availableLiquidity}</p>
+              <p className="text-xl md:text-2xl font-semibold text-gray-300">{poolData?.totalContributors || '—'}</p>
             )}
           </motion.div>
         </div>
@@ -234,12 +246,23 @@ export default function PoolsView({ isWalletConnected, onConnect, userAddress })
         </button>
       </div>
 
+      {error && (
+        <div className="bg-red-900/20 border border-red-700 rounded-xl p-4 text-red-400">
+          <p className="font-semibold">Failed to load pool data</p>
+          <p className="text-sm mt-1">{error}</p>
+          <p className="text-xs mt-2">Make sure the backend server is running on port 3001</p>
+        </div>
+      )}
+
       <div className="space-y-4">
         {isLoading ? (
           <>
             <SkeletonPool />
-            <SkeletonPool />
           </>
+        ) : pools.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="text-gray-500">No pool data available</div>
+          </div>
         ) : (
           pools.map((pool, index) => (
             <motion.div
@@ -252,82 +275,45 @@ export default function PoolsView({ isWalletConnected, onConnect, userAddress })
                 delay: index * 0.1,
                 ease: [0.4, 0, 0.2, 1]
               }}
+              onClick={() => setShowDetail(true)}
             >
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
                   <div className="flex items-center">
                     <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-neutral-700 border border-neutral-800 flex items-center justify-center text-sm md:text-base">
-                      $
-                    </div>
-                    <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-neutral-700 border border-neutral-800 flex items-center justify-center -ml-2 md:-ml-2 text-sm md:text-base">
-                      T
+                      P
                     </div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-gray-500 mb-0.5">{pool.protocol}</div>
-                    <div className="text-base md:text-lg font-bold text-white">{pool.baseAsset} / {pool.quoteAsset}</div>
+                    <div className="text-[10px] text-gray-500 mb-0.5">Liquidation Pool</div>
+                    <div className="text-base md:text-lg font-bold text-white">USDC Pool</div>
                   </div>
-                </div>
-
-                <div className="hidden md:flex items-center gap-3 text-xs">
-                  <div>
-                    <span className="text-gray-400">Swap operator</span>
-                    <span className="ml-1 text-[#c5ff4a] hover:text-[#b0e641] cursor-pointer">
-                      {pool.swapOperator}
-                    </span>
-                  </div>
-                  <div className="text-gray-500">
-                    {pool.createdAt}
-                  </div>
-                  <button className="text-gray-400 hover:text-white flex items-center gap-1">
-                    Spy
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </button>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-6 gap-2 md:gap-3 items-center">
                 <div>
-                  <div className="text-[10px] text-gray-500 mb-0.5">LP NAV</div>
-                  <div className="text-sm font-semibold text-white">{pool.lpNav}</div>
+                  <div className="text-[10px] text-gray-500 mb-0.5">Total Shares</div>
+                  <div className="text-sm font-semibold text-white">{pool.totalShares || '—'}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-gray-500 mb-0.5">24h volume</div>
-                  <div className="text-sm font-semibold text-white">{pool.volume24h}</div>
+                  <div className="text-[10px] text-gray-500 mb-0.5">USDC Liquidity</div>
+                  <div className="text-sm font-semibold text-white">{pool.totalUSDCLiquidity || '—'}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-gray-500 mb-0.5">Current price</div>
-                  <div className="flex items-center gap-1">
-                    <div className="text-sm font-semibold text-white">{pool.currentPrice}</div>
-                    <button className="text-gray-400 hover:text-white">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="text-[10px] text-gray-500">{pool.pricePair}</div>
+                  <div className="text-[10px] text-gray-500 mb-0.5">ETH Liquidity</div>
+                  <div className="text-sm font-semibold text-white">{pool.totalETHLiquidity || '—'}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-gray-500 mb-0.5">LP P&L</div>
-                  <div className={`text-sm font-semibold ${pool.isNegativePnl ? 'text-red-400' : 'text-green-400'}`}>
-                    {pool.lpPnl}
-                  </div>
-                  <div className="text-[10px] text-gray-500">{pool.lpPnlPercent}</div>
+                  <div className="text-[10px] text-gray-500 mb-0.5">FLOW Liquidity</div>
+                  <div className="text-sm font-semibold text-white">{pool.totalFlowLiquidity || '—'}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-gray-500 mb-0.5">7d ROE</div>
-                  <div className={`text-sm font-semibold ${pool.isNegativePnl ? 'text-red-400' : 'text-green-400'}`}>
-                    {pool.roe7d}
-                  </div>
+                  <div className="text-[10px] text-gray-500 mb-0.5">Contributors</div>
+                  <div className="text-sm font-semibold text-white">{pool.totalContributors || '—'}</div>
                 </div>
                 {isWalletConnected ? (
-                  <button
-                    // onClick={handleAddLiquidity}
-                    // disabled={!supplyAmount || parseFloat(supplyAmount) <= 0}
-                    className="w-full font-semibold py-3 rounded-lg bg-[#c5ff4a] hover:bg-[#b0e641] text-neutral-900"
-                  >
+                  <button className="w-full font-semibold py-3 rounded-lg bg-[#c5ff4a] hover:bg-[#b0e641] text-neutral-900">
                     Add Liquidity
                   </button>
                 ) : (
@@ -353,3 +339,4 @@ export default function PoolsView({ isWalletConnected, onConnect, userAddress })
     </div>
   )
 }
+

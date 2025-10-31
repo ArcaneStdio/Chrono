@@ -403,6 +403,58 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+/**
+ * Get pool data endpoint
+ */
+app.get('/api/pool/data', async (req, res) => {
+  try {
+    const scriptPath = path.resolve(__dirname, '../../cadence/scripts/poolData.cdc');
+    const command = `flow scripts execute ${scriptPath} --network testnet`;
+
+    console.log(`Executing: ${command}`);
+
+    const { stdout, stderr } = await execAsync(command, {
+      maxBuffer: 1024 * 1024 * 10,
+      cwd: path.resolve(__dirname, '../..')
+    });
+
+    if (stderr) {
+      console.warn('Flow script warnings:', stderr);
+    }
+
+    // Parse JSON-like structure from Flow CLI output
+    let jsonResult = stdout.match(/Result:\s*(\{[\s\S]*\})/);
+    if (!jsonResult) {
+      const jsonMatches = stdout.match(/\{[\s\S]*\}/g);
+      if (jsonMatches && jsonMatches.length > 0) {
+        jsonResult = [null, jsonMatches[jsonMatches.length - 1]];
+      }
+    }
+
+    if (!jsonResult) {
+      throw new Error('Could not parse Flow script output for pool data');
+    }
+
+    // The Flow map may not be strictly JSON; attempt a safe conversion
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonResult[1]);
+    } catch (_) {
+      // Best-effort conversions: replace UFix64-like numbers in quotes
+      const normalized = jsonResult[1]
+        .replace(/UFix64\(/g, '')
+        .replace(/\)/g, '')
+        .replace(/([\{,]\s*"[^"]+"\s*:\s*)([\d.]+)(\s*[\}\,])/g, '$1$2$3');
+      parsed = JSON.parse(normalized);
+    }
+
+    return res.json({ success: true, data: parsed });
+  } catch (error) {
+    console.error('Error fetching pool data:', error);
+    return res.status(500).json({ error: 'Failed to fetch pool data', details: error.message });
+  }
+});
+
 // ==================== SERVER STARTUP ====================
 
 const PORT = process.env.PORT || 3001;
@@ -417,6 +469,7 @@ app.listen(PORT, async () => {
   console.log('  POST /api/vault/update - Update vault data');
   console.log('  GET  /api/vault/data - Get vault data');
   console.log('  GET  /api/user/supply/:address - Get user supply by token');
+  console.log('  GET  /api/pool/data - Get pool data');
   console.log('  GET  /health - Health check');
   console.log('========================================');
   

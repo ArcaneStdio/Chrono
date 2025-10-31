@@ -6,16 +6,16 @@ import {
   formatTokenAmount,
   formatTimestamp
 } from '../utils/portfolioData'
-import { withdrawLending } from '../utils/withdraw-lending'
-import { repayLoan } from '../utils/repay-loan'
+import BorrowPositionDetailsView from './BorrowPositionDetailsView'
+import LendingPositionDetailsView from './LendingPositionDetailsView'
 
 export default function PortfolioView({ userAddress, isWalletConnected, onConnect }) {
   const [activeTab, setActiveTab] = useState('lending')
   const [lendingPositions, setLendingPositions] = useState([])
   const [borrowingPositions, setBorrowingPositions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [withdrawingId, setWithdrawingId] = useState(null)
-  const [repayingId, setRepayingId] = useState(null)
+  const [selectedLendingPosition, setSelectedLendingPosition] = useState(null)
+  const [selectedBorrowPosition, setSelectedBorrowPosition] = useState(null)
 
   useEffect(() => {
     if (isWalletConnected && userAddress) {
@@ -35,11 +35,52 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
       ])
       setLendingPositions(lending || [])
       setBorrowingPositions(borrowing || [])
+      
+      // Update selected positions if they're still in the list
+      if (selectedLendingPosition) {
+        const updatedPosition = lending?.find(p => p.id === selectedLendingPosition.id)
+        if (updatedPosition) {
+          setSelectedLendingPosition(updatedPosition)
+        }
+      }
+      if (selectedBorrowPosition) {
+        const updatedPosition = borrowing?.find(p => p.id === selectedBorrowPosition.id)
+        if (updatedPosition) {
+          setSelectedBorrowPosition(updatedPosition)
+        }
+      }
     } catch (error) {
       console.error('Failed to load positions:', error)
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Show detail view if position is selected
+  if (selectedLendingPosition) {
+    return (
+      <LendingPositionDetailsView
+        position={selectedLendingPosition}
+        onBack={() => setSelectedLendingPosition(null)}
+        isWalletConnected={isWalletConnected}
+        onConnect={onConnect}
+        userAddress={userAddress}
+        onActionSuccess={loadPositions}
+      />
+    )
+  }
+
+  if (selectedBorrowPosition) {
+    return (
+      <BorrowPositionDetailsView
+        position={selectedBorrowPosition}
+        onBack={() => setSelectedBorrowPosition(null)}
+        isWalletConnected={isWalletConnected}
+        onConnect={onConnect}
+        userAddress={userAddress}
+        onActionSuccess={loadPositions}
+      />
+    )
   }
 
   if (!isWalletConnected) {
@@ -143,21 +184,20 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                   <th className="text-left p-4 text-gray-400 font-medium text-sm">Amount</th>
                   <th className="text-left p-4 text-gray-400 font-medium text-sm">Status</th>
                   <th className="text-left p-4 text-gray-400 font-medium text-sm">Timestamp</th>
-                  <th className="text-left p-4 text-gray-400 font-medium text-sm">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <>
-                    <SkeletonRow colSpan={5} />
-                    <SkeletonRow colSpan={5} />
-                    <SkeletonRow colSpan={5} />
+                    <SkeletonRow colSpan={4} />
+                    <SkeletonRow colSpan={4} />
+                    <SkeletonRow colSpan={4} />
                   </>
                 ) : lendingPositions.length > 0 ? (
                   lendingPositions.map((position, index) => (
                     <motion.tr
                       key={index}
-                      className="border-b border-neutral-700/50 hover:bg-neutral-800/50 transition-colors"
+                      className="border-b border-neutral-700/50 hover:bg-neutral-800/50 transition-colors cursor-pointer"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{
@@ -165,6 +205,7 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                         delay: index * 0.05,
                         ease: [0.4, 0, 0.2, 1]
                       }}
+                      onClick={() => setSelectedLendingPosition(position)}
                     >
                       <td className="p-4">
                         <div className="flex items-center gap-2">
@@ -193,35 +234,11 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                           {formatTimestamp(position.timestamp)}
                         </div>
                       </td>
-                      <td className="p-4">
-                        <button
-                          disabled={!position.isActive || withdrawingId === position.id}
-                          onClick={async () => {
-                            try {
-                              setWithdrawingId(position.id)
-                              await withdrawLending(position.id)
-                              await loadPositions()
-                            } catch (e) {
-                              console.error('Withdraw failed', e)
-                              alert('Withdraw failed. See console for details.')
-                            } finally {
-                              setWithdrawingId(null)
-                            }
-                          }}
-                          className={`px-3 py-1.5 rounded text-sm font-medium transition-colors border ${
-                            !position.isActive || withdrawingId === position.id
-                              ? 'bg-neutral-800 border-neutral-700 text-gray-500 cursor-not-allowed'
-                              : 'bg-neutral-800 border-neutral-700 text-gray-300 hover:bg-neutral-700 hover:text-white'
-                          }`}
-                        >
-                          {withdrawingId === position.id ? 'Withdrawing...' : 'Withdraw'}
-                        </button>
-                      </td>
                     </motion.tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="5" className="p-8 text-center text-gray-500">
+                    <td colSpan="4" className="p-8 text-center text-gray-500">
                       No lending positions found
                     </td>
                   </tr>
@@ -250,21 +267,20 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                   <th className="text-left p-4 text-gray-400 font-medium text-sm">Health Factor</th>
                   <th className="text-left p-4 text-gray-400 font-medium text-sm">Status</th>
                   <th className="text-left p-4 text-gray-400 font-medium text-sm">Timestamp</th>
-                  <th className="text-left p-4 text-gray-400 font-medium text-sm">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <>
-                    <SkeletonRow colSpan={8} />
-                    <SkeletonRow colSpan={8} />
-                    <SkeletonRow colSpan={8} />
+                    <SkeletonRow colSpan={7} />
+                    <SkeletonRow colSpan={7} />
+                    <SkeletonRow colSpan={7} />
                   </>
                 ) : borrowingPositions.length > 0 ? (
                   borrowingPositions.map((position, index) => (
                     <motion.tr
                       key={index}
-                      className="border-b border-neutral-700/50 hover:bg-neutral-800/50 transition-colors"
+                      className="border-b border-neutral-700/50 hover:bg-neutral-800/50 transition-colors cursor-pointer"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{
@@ -272,6 +288,7 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                         delay: index * 0.05,
                         ease: [0.4, 0, 0.2, 1]
                       }}
+                      onClick={() => setSelectedBorrowPosition(position)}
                     >
                       {(() => {
                         const nowSec = Math.floor(Date.now() / 1000)
@@ -338,30 +355,6 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                       <td className="p-4">
                         <div className={`text-sm ${isOverdue ? 'text-red-400' : 'text-gray-400'}`}>{formatTimestamp(position.timestamp)}</div>
                       </td>
-                      <td className="p-4">
-                        <button
-                          disabled={!position.isActive || isOverdue || repayingId === position.id}
-                          onClick={async () => {
-                            try {
-                              setRepayingId(position.id)
-                              await repayLoan(position.id)
-                              await loadPositions()
-                            } catch (e) {
-                              console.error('Repay failed', e)
-                              alert('Repay failed. See console for details.')
-                            } finally {
-                              setRepayingId(null)
-                            }
-                          }}
-                          className={`px-3 py-1.5 rounded text-sm font-medium transition-colors border ${
-                            !position.isActive || isOverdue || repayingId === position.id
-                              ? 'bg-neutral-800 border-neutral-700 text-gray-500 cursor-not-allowed'
-                              : 'bg-neutral-800 border-neutral-700 text-gray-300 hover:bg-neutral-700 hover:text-white'
-                          }`}
-                        >
-                          {repayingId === position.id ? 'Repaying...' : 'Repay'}
-                        </button>
-                      </td>
                           </>
                         )
                       })()}
@@ -369,7 +362,7 @@ export default function PortfolioView({ userAddress, isWalletConnected, onConnec
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="8" className="p-8 text-center text-gray-500">
+                    <td colSpan="7" className="p-8 text-center text-gray-500">
                       No borrowed positions found
                     </td>
                   </tr>

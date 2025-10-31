@@ -123,7 +123,9 @@ export function transformForLendView(vaultData) {
       utilization: vault.utilizationRate.toFixed(2) + '%',
       utilizationPercent: vault.utilizationRate,
       totalBorrowed: formatUSD(vault.totalBorrowedUSD),
+      totalBorrowedToken: formatTokenAmount(vault.totalBorrowed, vault.symbol),
       availableLiquidity: formatUSD(vault.availableLiquidityUSD),
+      availableLiquidityToken: formatTokenAmount(vault.availableLiquidity, vault.symbol),
       borrowAPY,
       price: vault.price
     };

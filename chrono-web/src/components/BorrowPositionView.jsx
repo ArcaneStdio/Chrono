@@ -9,6 +9,7 @@ import LTVGraph from './LTVGraph'
 import LTGraph from './LTGraph'  
 
 import { createBorrowingPosition } from '../utils/borrow-transaction-eth'
+import { createBorrowUSDC, createBorrowWETH, createBorrowFLOW, createBorrowUSDCWithFlowCollateral } from '../utils/borrow-transactions'
 import * as fcl from '@onflow/fcl'
 
 
@@ -30,7 +31,7 @@ export default function BorrowPositionView({
   const [userSupply, setUserSupply] = useState({ ETH: 0, FLOW: 0, USDC: 0 })
   const [maxSupplyAmount, setMaxSupplyAmount] = useState(0)
   const [isLoadingSupply, setIsLoadingSupply] = useState(false)
-  const [ethPrice, setEthPrice] = useState(0) // Store ETH price for USDC conversion
+  const [prices, setPrices] = useState({ ETH: 0, WETH: 0, USDC: 1, FLOW: 0 }) // Store prices for all tokens
   const [isBorrowing, setIsBorrowing] = useState(false)
   const [txStatus, setTxStatus] = useState(null)
 
@@ -69,20 +70,32 @@ export default function BorrowPositionView({
 
   useEffect(() => {
     const fetchVaultData = async () => {
-      if (!asset || (asset.symbol !== 'WETH' && asset.symbol !== 'ETH')) return
+      if (!asset) return
       
       try {
         const response = await fetch('http://localhost:3001/api/vault/data')
         const data = await response.json()
         
         if (data && data.vaults) {
-          const ethVault = data.vaults.find(v => v.symbol === 'ETH' || v.symbol === 'WETH')
-          if (ethVault && ethVault.price) {
-            setEthPrice(parseFloat(ethVault.price))
-          }
+          const newPrices = { ETH: 0, WETH: 0, USDC: 1, FLOW: 0 }
+          
+          // Fetch prices for all tokens
+          data.vaults.forEach(vault => {
+            if (vault.symbol === 'ETH' || vault.symbol === 'WETH') {
+              const price = parseFloat(vault.price) || 0
+              newPrices.ETH = price
+              newPrices.WETH = price
+            } else if (vault.symbol === 'USDC') {
+              newPrices.USDC = parseFloat(vault.price) || 1
+            } else if (vault.symbol === 'FLOW') {
+              newPrices.FLOW = parseFloat(vault.price) || 0
+            }
+          })
+          
+          setPrices(newPrices)
         }
       } catch (error) {
-        console.error('Failed to fetch vault data for ETH price:', error)
+        console.error('Failed to fetch vault data for prices:', error)
       }
     }
 
@@ -146,11 +159,47 @@ export default function BorrowPositionView({
   const maxLTV = calculateMaxLTV(totalMinutes)
   const currentLT = calculateLT(totalMinutes)
 
+  // Convert collateral value to USD, then to borrow token amount
   const getCollateralValueInBorrowToken = (collateralAmount) => {
-    if ((asset?.symbol === 'WETH' || asset?.symbol === 'ETH') && ethPrice > 0) {
-      return collateralAmount * ethPrice
+    if (!collateralAmount || collateralAmount <= 0) return 0
+    
+    // Get collateral price
+    const collateralPriceKey = collateralSymbol === 'WETH' ? 'WETH' : collateralSymbol
+    const collateralPrice = prices[collateralPriceKey] || 0
+    
+    // Get borrow token price
+    const borrowPriceKey = borrowTokenSymbol === 'WETH' ? 'WETH' : borrowTokenSymbol
+    const borrowPrice = prices[borrowPriceKey] || 1 // Default to 1 for USDC
+    
+    // Convert collateral to USD value
+    const collateralValueUSD = collateralAmount * collateralPrice
+    
+    // Convert USD value to borrow token amount
+    if (borrowPrice > 0) {
+      return collateralValueUSD / borrowPrice
     }
-    return collateralAmount
+    
+    return 0
+  }
+  
+  // Convert borrow amount to USD for LTV calculation
+  const getBorrowValueInUSD = (borrowAmount) => {
+    if (!borrowAmount || borrowAmount <= 0) return 0
+    
+    const borrowPriceKey = borrowTokenSymbol === 'WETH' ? 'WETH' : borrowTokenSymbol
+    const borrowPrice = prices[borrowPriceKey] || 1
+    
+    return borrowAmount * borrowPrice
+  }
+  
+  // Convert collateral amount to USD for LTV calculation
+  const getCollateralValueInUSD = (collateralAmount) => {
+    if (!collateralAmount || collateralAmount <= 0) return 0
+    
+    const collateralPriceKey = collateralSymbol === 'WETH' ? 'WETH' : collateralSymbol
+    const collateralPrice = prices[collateralPriceKey] || 0
+    
+    return collateralAmount * collateralPrice
   }
 
   const handleSupplyChange = (value) => {
@@ -162,7 +211,7 @@ export default function BorrowPositionView({
     if (valueToSet && ltvPercent > 0) {
       const collateralValueInBorrowToken = getCollateralValueInBorrowToken(parseFloat(valueToSet))
       const calculatedBorrow = (collateralValueInBorrowToken * ltvPercent) / 100
-      setBorrowAmount(calculatedBorrow.toFixed(6))
+      setBorrowAmount(calculatedBorrow.toFixed(8))
     } else {
       setBorrowAmount('')
     }
@@ -174,16 +223,21 @@ export default function BorrowPositionView({
     if (supplyAmount) {
       const collateralValueInBorrowToken = getCollateralValueInBorrowToken(parseFloat(supplyAmount))
       const calculatedBorrow = (collateralValueInBorrowToken * cappedLtv) / 100
-      setBorrowAmount(calculatedBorrow.toFixed(6))
+      setBorrowAmount(calculatedBorrow.toFixed(8))
     }
   }
 
   const handleBorrowChange = (value) => {
     setBorrowAmount(value)
     if (supplyAmount && parseFloat(supplyAmount) > 0) {
-      const collateralValueInBorrowToken = getCollateralValueInBorrowToken(parseFloat(supplyAmount))
-      const calculatedLtv = (parseFloat(value) / collateralValueInBorrowToken) * 100
-      setLtvPercent(Math.min(calculatedLtv, maxLTV))
+      // Calculate LTV based on USD values
+      const collateralValueUSD = getCollateralValueInUSD(parseFloat(supplyAmount))
+      const borrowValueUSD = getBorrowValueInUSD(parseFloat(value))
+      
+      if (collateralValueUSD > 0) {
+        const calculatedLtv = (borrowValueUSD / collateralValueUSD) * 100
+        setLtvPercent(Math.min(calculatedLtv, maxLTV))
+      }
     }
   }
 
@@ -256,11 +310,42 @@ export default function BorrowPositionView({
     try {
       setIsBorrowing(true)
       setTxStatus(null)
-      const txId = await createBorrowingPosition(
-        collateralAmountFloat.toFixed(8), 
-        borrowAmountFloat.toFixed(8),    
-        duration.toString()               
-      )
+      let txId
+      
+      // Select transaction based on both collateral and borrow token
+      if (borrowTokenSymbol === 'USDC') {
+        if (collateralSymbol === 'FLOW' || collateralSymbol === 'FLOWToken') {
+          // Borrow USDC using FLOW collateral
+          txId = await createBorrowUSDCWithFlowCollateral(
+            collateralAmountFloat.toFixed(8),
+            borrowAmountFloat.toFixed(8),
+            duration.toString()
+          )
+        } else {
+          // Borrow USDC using WETH collateral (default)
+          txId = await createBorrowUSDC(
+            collateralAmountFloat.toFixed(8),
+            borrowAmountFloat.toFixed(8),
+            duration.toString()
+          )
+        }
+      } else if (borrowTokenSymbol === 'WETH') {
+        // Borrow WETH
+        txId = await createBorrowWETH(
+          collateralAmountFloat.toFixed(8),
+          borrowAmountFloat.toFixed(8),
+          duration.toString()
+        )
+      } else if (borrowTokenSymbol === 'FLOW') {
+        // Borrow FLOW
+        txId = await createBorrowFLOW(
+          collateralAmountFloat.toFixed(8),
+          borrowAmountFloat.toFixed(8),
+          duration.toString()
+        )
+      } else {
+        throw new Error(`Unsupported borrow token: ${borrowTokenSymbol}`)
+      }
       console.log('Borrowing Transaction Sent. ID:', txId)
       setTxStatus({ type: 'success', txId, collateral: collateralAmountFloat, borrow: borrowAmountFloat, duration })
       setBorrowAmount('')
@@ -280,7 +365,9 @@ export default function BorrowPositionView({
     !isNaN(parseFloat(borrowAmount)) && parseFloat(borrowAmount) > 0 && 
     totalMinutes > 0
 
-  const buttonText = isWalletConnected
+  const buttonText = isBorrowing
+    ? 'Creating Position...'
+    : isWalletConnected
     ? (isReadyForTransaction ? 'Create Borrow Position' : 'Enter Amounts')
     : 'Connect Wallet'
 
@@ -290,11 +377,11 @@ export default function BorrowPositionView({
       return
     }
 
-    if (!isReadyForTransaction) return
+    if (!isReadyForTransaction || isBorrowing) return
     await handleBorrow()
   }
 
-  const buttonDisabled = isWalletConnected && !isReadyForTransaction  
+  const buttonDisabled = isBorrowing || (isWalletConnected && !isReadyForTransaction)  
   // --- End New Borrow Transaction Logic ---
 
 
@@ -328,15 +415,15 @@ export default function BorrowPositionView({
           <div className="flex items-center gap-3 mb-4">
             <div className="flex items-center flex-shrink-0">
               <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-neutral-800 border-2 border-neutral-950 flex items-center justify-center text-white font-semibold text-sm md:text-base">
-                {asset.symbol.substring(0, 2)}
+                {collateralSymbol.substring(0, 2)}
               </div>
               <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-neutral-800 border-2 border-neutral-950 flex items-center justify-center -ml-3 md:-ml-4 text-white font-semibold text-sm md:text-base">
-                USD
+                {borrowTokenSymbol.substring(0, 2)}
               </div>
             </div>
             <div>
               <div className="text-xs text-gray-500">Chrono Protocol</div>
-              <h1 className="text-xl md:text-3xl font-bold text-white">{asset.name} / USDC</h1>
+              <h1 className="text-xl md:text-3xl font-bold text-white">{collateralSymbol} / {borrowTokenSymbol}</h1>
             </div>
           </div>
 
@@ -710,11 +797,21 @@ export default function BorrowPositionView({
               {/* Updated Conditional Button */}
               <button
                 onClick={handleButtonClick}
-                className={`w-full font-semibold py-3 rounded-lg transition-colors ${isWalletConnected && isReadyForTransaction
+                disabled={buttonDisabled}
+                className={`w-full font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                  isBorrowing
+                    ? 'bg-[#c5ff4a]/70 text-neutral-900 cursor-wait'
+                    : isWalletConnected && isReadyForTransaction
                     ? 'bg-[#c5ff4a] hover:bg-[#b0e641] text-neutral-900'
                     : 'bg-neutral-700 text-gray-400 cursor-not-allowed'
-                  }`}
+                }`}
               >
+                {isBorrowing && (
+                  <svg className="animate-spin h-5 w-5 text-neutral-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
                 {buttonText}
               </button>
               {/* Display user address if connected */}

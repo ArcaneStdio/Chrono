@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
 import BorrowPositionView from './BorrowPositionView'
 import { fetchVaultData, transformForBorrowView } from '../utils/vaultData'
+import { fetchUserBorrowingPositions, formatTokenAmount, formatTimestamp } from '../utils/portfolioData'
+import { repayLoan } from '../utils/repay-loan'
 
 export default function BorrowView({ 
   isWalletConnected, 
@@ -13,6 +15,9 @@ export default function BorrowView({
   const [isLoading, setIsLoading] = useState(true)
   const [vaultData, setVaultData] = useState(null)
   const [error, setError] = useState(null)
+  const [userPositions, setUserPositions] = useState([])
+  const [isUserPosLoading, setIsUserPosLoading] = useState(true)
+  const [repayingId, setRepayingId] = useState(null)
   
   useEffect(() => {
     async function loadVaultData() {
@@ -35,6 +40,29 @@ export default function BorrowView({
     const interval = setInterval(loadVaultData, 20 * 1000)
     return () => clearInterval(interval)
   }, [])
+
+  // Load user's active borrowing positions
+  useEffect(() => {
+    async function loadUserPositions() {
+      try {
+        if (!isWalletConnected || !userAddress) {
+          setUserPositions([])
+          setIsUserPosLoading(false)
+          return
+        }
+        setIsUserPosLoading(true)
+        const positions = await fetchUserBorrowingPositions(userAddress)
+        setUserPositions(Array.isArray(positions) ? positions.filter(p => p.isActive) : [])
+      } catch (e) {
+        console.error('Failed to load user positions:', e)
+        setUserPositions([])
+      } finally {
+        setIsUserPosLoading(false)
+      }
+    }
+
+    loadUserPositions()
+  }, [isWalletConnected, userAddress])
 
   const borrowAssets = vaultData ? transformForBorrowView(vaultData) : []
 
@@ -127,15 +155,76 @@ export default function BorrowView({
         transition={{ duration: 0.4, delay: 0.3 }}
       >
         <h2 className="text-xl font-bold text-white mb-4">Your Active Positions</h2>
-        <div className="text-center py-12">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-neutral-800 flex items-center justify-center">
-            <svg className="w-8 h-8 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
+        {isUserPosLoading ? (
+          <div className="text-center py-8 text-gray-400">Loading positions...</div>
+        ) : userPositions.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-neutral-800 flex items-center justify-center">
+              <svg className="w-8 h-8 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <p className="text-gray-400">No active borrowing positions</p>
           </div>
-          <p className="text-gray-400">No active borrowing positions</p>
-          <p className="text-gray-500 text-sm mt-2">Connect your wallet to view or create positions</p>
-        </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px]">
+              <thead>
+                <tr className="border-b border-neutral-700">
+                  <th className="text-left p-4 text-gray-400 font-medium text-sm">Collateral</th>
+                  <th className="text-left p-4 text-gray-400 font-medium text-sm">Borrowed</th>
+                  <th className="text-left p-4 text-gray-400 font-medium text-sm">Duration</th>
+                  <th className="text-left p-4 text-gray-400 font-medium text-sm">Status</th>
+                  <th className="text-left p-4 text-gray-400 font-medium text-sm">Opened</th>
+                </tr>
+              </thead>
+              <tbody>
+                {userPositions.map((p, idx) => {
+                  const nowSec = Math.floor(Date.now() / 1000)
+                  const ts = p.timestamp ? parseFloat(p.timestamp) : 0
+                  const durMin = p.durationMinutes ? parseFloat(p.durationMinutes) : 0
+                  const deadline = p.repaymentDeadline ? parseFloat(p.repaymentDeadline) : (ts && durMin ? ts + durMin * 60 : 0)
+                  const isOverdue = deadline > 0 && nowSec > deadline
+                  const timeLeftMin = deadline > 0 ? Math.max(0, Math.floor((deadline - nowSec) / 60)) : null
+                  return (
+                    <tr key={idx} className="border-b border-neutral-700/50">
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-white font-semibold text-xs">
+                            {p.collateralType?.substring(0, 2) || '—'}
+                          </div>
+                          <div>
+                            <div className="text-white font-medium">{formatTokenAmount(p.collateralAmount)}</div>
+                            <div className="text-gray-400 text-xs">{p.collateralType}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-white font-medium">{formatTokenAmount(p.borrowAmount)}</div>
+                        <div className="text-gray-400 text-xs">{p.borrowTokenType}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className={`font-medium ${isOverdue ? 'text-red-400' : 'text-gray-300'}`}>
+                          {deadline ? (isOverdue ? 'Expired' : `${timeLeftMin} min left`) : (p.durationMinutes ? `${p.durationMinutes} min` : '—')}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          isOverdue ? 'bg-red-900/30 text-red-400 border border-red-700/50' : 'bg-green-900/30 text-green-400 border border-green-700/50'
+                        }`}>
+                          {isOverdue ? 'Overdue' : 'Active'}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <div className={`text-sm ${isOverdue ? 'text-red-400' : 'text-gray-400'}`}>{formatTimestamp(p.timestamp)}</div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </motion.div>
 
       {error && (
