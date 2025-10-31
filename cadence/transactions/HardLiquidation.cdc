@@ -35,7 +35,6 @@ transaction(positionId: UInt64, debtTokenType: String) {
             positionId: positionId,
             liquidatorAddress: self.signerAddress,
             debtTokenType: debtTokenType,
-            oraclePayment: <-self.oraclePayment
         )
         
         log("Successfully executed hard liquidation for position: ".concat(positionId.toString()))

@@ -29,9 +29,7 @@ transaction(usdcAmount: UFix64) {
         self.oraclePayment <- flowVaultRef.withdraw(amount: BandOracle.getFee()) as! @FlowToken.Vault
         
         // Borrow PoolAdmin capability
-        self.poolAdmin = signer.storage.borrow<&LiquidationPool.PoolAdmin>(
-            from: LiquidationPool.PoolAdminStoragePath
-        ) ?? panic("Could not borrow PoolAdmin reference")
+        self.poolAdmin = LiquidationPool.PoolAdmin()
     }
     
     execute {

@@ -34,21 +34,21 @@ transaction(positionId: UInt64) {
         self.lendingManagerRef = TimeLendingProtocol2.borrowLendingManager()
         
         // Determine which token type was lent
-        let tokenType = self.position.tokenType
+        let tokenType = self.position.tokenType.identifier
         
         log("Lending Position Details:")
         log("  Position ID: ".concat(positionId.toString()))
         log("  Lender: ".concat(self.position.lender.toString()))
         log("  Amount: ".concat(self.position.amount.toString()))
-        log("  Token Type: ".concat(tokenType.identifier))
+        log("  Token Type: ".concat(tokenType))
         log("  Timestamp: ".concat(self.position.timestamp.toString()))
-        
-        if tokenType.toString().contains("USDC") {
+
+        if tokenType.contains("USDC") {
             // Get recipient capability for WrappedUSDC1
             self.recipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
                 WrappedUSDC1.ReceiverPublicPath
             ).borrow() ?? panic("Could not borrow WrappedUSDC receiver capability")
-        } else if tokenType.toString().contains("Flow") {
+        } else if tokenType.contains("Flow") {
             // Get recipient capability for FlowToken
             self.recipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
                 /public/flowTokenReceiver
