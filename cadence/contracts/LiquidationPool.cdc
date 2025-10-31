@@ -143,13 +143,7 @@ access(all) contract LiquidationPool {
     // Pool Admin resource
     access(all) resource PoolAdmin {
         
-        // Helper function to get total pool value in USD
-        access(all) fun getTotalPoolValueUSD(ethPrice: UFix64): UFix64 {
-            // ETH value in USD + USDC (1:1 with USD) + Flow (1:1 with USD)
-            return (LiquidationPool.totalETHLiquidity * ethPrice) + 
-                   LiquidationPool.totalUSDCLiquidity + 
-                   LiquidationPool.totalFlowLiquidity
-        }
+        // Helper function to get total pool value in US
         
         // Contribute ETH to pool
         
@@ -236,7 +230,17 @@ access(all) contract LiquidationPool {
         // Execute hard liquidation for overdue position
         
         // Convert collected ETH collateral to Flow rewards
-        access(all) fun depositFlowRewardsFromETH(flowVault: @FlowToken.Vault, ethSold: UFix64) {
+        
+    }
+
+    access(all) fun getTotalPoolValueUSD(ethPrice: UFix64): UFix64 {
+            // ETH value in USD + USDC (1:1 with USD) + Flow (1:1 with USD)
+            return (LiquidationPool.totalETHLiquidity * ethPrice) + 
+                   LiquidationPool.totalUSDCLiquidity + 
+                   LiquidationPool.totalFlowLiquidity
+        }
+
+    access(all) fun depositFlowRewardsFromETH(flowVault: @FlowToken.Vault, ethSold: UFix64) {
             let flowAmount = flowVault.balance
             LiquidationPool.flowVault.deposit(from: <-flowVault)
             LiquidationPool.pendingFlowRewards = LiquidationPool.pendingFlowRewards + flowAmount
@@ -316,7 +320,6 @@ access(all) contract LiquidationPool {
                 LiquidationPool.totalUSDCLiquidity = LiquidationPool.totalUSDCLiquidity + amount
             }
         }
-    }
     
     // Public functions
     access(all) fun createContributor(): @Contributor {
