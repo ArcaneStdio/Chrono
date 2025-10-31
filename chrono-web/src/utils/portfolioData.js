@@ -3,7 +3,7 @@ import * as fcl from '@onflow/fcl'
 
 // Read Cadence scripts
 const lendingPositionsScript = `
-import TimeLendingProtocol2 from 0xe11cab85e85ae137
+import TimeLendingProtocol2 from 0x904a8cd375b62ddc
 
 access(all) fun main(user: Address): [{String: AnyStruct}] {
     let result: [{String: AnyStruct}] = []
@@ -27,7 +27,7 @@ access(all) fun main(user: Address): [{String: AnyStruct}] {
 `
 
 const borrowingPositionsScript = `
-import TimeLendingProtocol2 from 0xe11cab85e85ae137
+import TimeLendingProtocol2 from 0x904a8cd375b62ddc
 
 access(all) fun main(user: Address): [{String: AnyStruct}] {
     let result: [{String: AnyStruct}] = []

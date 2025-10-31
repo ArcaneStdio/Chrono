@@ -17,7 +17,7 @@ export const createLendingPosition = async (amount, tokenSymbol) => {
     createLendingCadence = `
       import FungibleToken from 0x9a0766d93b6608b7
       import WrappedETH1 from 0xe11cab85e85ae137
-      import TimeLendingProtocol2 from 0xe11cab85e85ae137
+      import TimeLendingProtocol2 from 0x904a8cd375b62ddc
 
       transaction(amount: UFix64) {
           let lenderVault: @WrappedETH1.Vault 
@@ -48,7 +48,7 @@ export const createLendingPosition = async (amount, tokenSymbol) => {
     createLendingCadence = `
       import FungibleToken from 0x9a0766d93b6608b7
       import WrappedUSDC1 from 0xe11cab85e85ae137
-      import TimeLendingProtocol2 from 0xe11cab85e85ae137
+      import TimeLendingProtocol2 from 0x904a8cd375b62ddc
 
       transaction(amount: UFix64) {
           let lenderVault: @WrappedUSDC1.Vault
@@ -79,7 +79,7 @@ export const createLendingPosition = async (amount, tokenSymbol) => {
     createLendingCadence = `
       import FungibleToken from 0x9a0766d93b6608b7
       import FlowToken from 0x7e60df042a9c0868
-      import TimeLendingProtocol2 from 0xe11cab85e85ae137
+      import TimeLendingProtocol2 from 0x904a8cd375b62ddc
 
       transaction(amount: UFix64) {
           let lenderVault: @FlowToken.Vault

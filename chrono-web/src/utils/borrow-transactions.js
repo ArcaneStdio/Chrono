@@ -6,7 +6,7 @@ import { executeTransaction } from './flowWallet'
 const BORROW_USDC_TX = `
 import FungibleToken from 0x9a0766d93b6608b7
 import FlowToken from 0x7e60df042a9c0868
-import TimeLendingProtocol2 from 0xe11cab85e85ae137
+import TimeLendingProtocol2 from 0x904a8cd375b62ddc
 import WrappedETH1 from 0xe11cab85e85ae137
 import WrappedUSDC1 from 0xe11cab85e85ae137
 import BandOracle from 0x9fb6606c300b5051
@@ -59,7 +59,7 @@ transaction(
 const BORROW_WETH_TX = `
 import FungibleToken from 0x9a0766d93b6608b7
 import FlowToken from 0x7e60df042a9c0868
-import TimeLendingProtocol2 from 0xe11cab85e85ae137
+import TimeLendingProtocol2 from 0x904a8cd375b62ddc
 import WrappedETH1 from 0xe11cab85e85ae137
 import WrappedUSDC1 from 0xe11cab85e85ae137
 import BandOracle from 0x9fb6606c300b5051
@@ -133,7 +133,7 @@ transaction(
 const BORROW_USDC_FLOW_COLLATERAL_TX = `
 import FungibleToken from 0x9a0766d93b6608b7
 import FlowToken from 0x7e60df042a9c0868
-import TimeLendingProtocol2 from 0xe11cab85e85ae137
+import TimeLendingProtocol2 from 0x904a8cd375b62ddc
 import WrappedUSDC1 from 0xe11cab85e85ae137
 import BandOracle from 0x9fb6606c300b5051
 
@@ -193,7 +193,7 @@ transaction(
 const BORROW_FLOW_TX = `
 import FungibleToken from 0x9a0766d93b6608b7
 import FlowToken from 0x7e60df042a9c0868
-import TimeLendingProtocol2 from 0xe11cab85e85ae137
+import TimeLendingProtocol2 from 0x904a8cd375b62ddc
 import WrappedETH1 from 0xe11cab85e85ae137
 import BandOracle from 0x9fb6606c300b5051
 
@@ -245,7 +245,7 @@ export async function createBorrowUSDC(collateralAmount, borrowAmount, durationM
   const args = [
     fcl.arg(parseFloat(collateralAmount).toFixed(8), t.UFix64),
     fcl.arg(parseFloat(borrowAmount).toFixed(8), t.UFix64),
-    fcl.arg(String(durationMinutes), t.UInt64)
+    fcl.arg(String(durationMinutes*60), t.UInt64)
   ]
   return executeTransaction(BORROW_USDC_TX, args)
 }

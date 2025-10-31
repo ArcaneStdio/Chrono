@@ -4,7 +4,7 @@ import * as fcl from '@onflow/fcl'
 // Cadence transaction for repaying a loan and retrieving collateral
 const REPAY_LOAN_TX = `
 import FungibleToken from 0x9a0766d93b6608b7
-import TimeLendingProtocol2 from 0xe11cab85e85ae137
+import TimeLendingProtocol2 from 0x904a8cd375b62ddc
 import WrappedETH1 from 0xe11cab85e85ae137
 import WrappedUSDC1 from 0xe11cab85e85ae137
 

@@ -3,7 +3,7 @@ import FlowToken from 0x7e60df042a9c0868
 import WrappedETH1 from 0xe11cab85e85ae137
 import WrappedUSDC1 from 0xe11cab85e85ae137
 import Oracle from 0xa6729879755d30b1
-import TimeLendingProtocol2 from 0xe11cab85e85ae137
+import TimeLendingProtocol2 from 0x904a8cd375b62ddc
 import BandOracle from 0x9fb6606c300b5051
 
 access(all) contract LiquidationPool {

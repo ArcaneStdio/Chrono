@@ -3,7 +3,7 @@ import FlowTransactionSchedulerUtils from 0x8c5303eaa26202d6
 import FungibleToken from 0x9a0766d93b6608b7
 import FlowToken from 0x7e60df042a9c0868
 import LiquidationPoolTransactionHandler from 0xe11cab85e85ae137
-import TimeLendingProtocol2 from 0xe11cab85e85ae137
+import TimeLendingProtocol2 from 0x904a8cd375b62ddc
 import WrappedETH1 from 0xe11cab85e85ae137
 import WrappedUSDC1 from 0xe11cab85e85ae137
 import BandOracle from 0x9fb6606c300b5051
