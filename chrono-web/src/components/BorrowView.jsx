@@ -4,31 +4,15 @@ import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
 import BorrowPositionView from './BorrowPositionView'
 import { fetchVaultData, transformForBorrowView } from '../utils/vaultData'
 
-export default function BorrowView() {
+export default function BorrowView({ 
+  isWalletConnected, 
+  onConnect, 
+  userAddress 
+}) {
   const [selectedAsset, setSelectedAsset] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [vaultData, setVaultData] = useState(null)
   const [error, setError] = useState(null)
-
-  const [isWalletConnected, setIsWalletConnected] = useState(false)
-  const [userAddress, setUserAddress] = useState(null)
-
-  const handleWalletConnect = async () => {
-    try {
-      // Example for MetaMask/Ethereum wallet
-      if (window.ethereum) {
-        const accounts = await window.ethereum.request({ 
-          method: 'eth_requestAccounts' 
-        })
-        setUserAddress(accounts[0])
-        setIsWalletConnected(true)
-      } else {
-        alert('Please install MetaMask or another Web3 wallet')
-      }
-    } catch (error) {
-      console.error('Failed to connect wallet:', error)
-    }
-  }
   
   useEffect(() => {
     async function loadVaultData() {
@@ -59,7 +43,7 @@ export default function BorrowView() {
       asset={selectedAsset} 
       onBack={() => setSelectedAsset(null)}
       isWalletConnected={isWalletConnected}
-      onConnect={handleWalletConnect}
+      onConnect={onConnect}
       userAddress={userAddress}
     />
 

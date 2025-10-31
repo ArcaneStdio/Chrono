@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
 import { SearchIcon, TrendUpIcon, SortIcon } from './Icons'
 import LendPositionView from './LendPositionView'
-import { fetchVaultData, transformForLendView, getProtocolStats } from '../utils/vaultData'
+import { fetchVaultData, transformForLendView, getProtocolStats, updateVaultDataFromBackend } from '../utils/vaultData'
 
 export default function LendView({ isWalletConnected, onConnect, userAddress }) {
   const [inWallet, setInWallet] = useState(true)
@@ -35,6 +35,24 @@ export default function LendView({ isWalletConnected, onConnect, userAddress }) 
     return () => clearInterval(interval)
   }, [])
 
+  const refreshVaultData = async () => {
+    try {
+      console.log('Refreshing vault data...')
+      await updateVaultDataFromBackend()
+      const data = await fetchVaultData()
+      setVaultData(data)
+      console.log('Vault data refreshed successfully')
+    } catch (err) {
+      console.error('Failed to refresh vault data:', err)
+      try {
+        const data = await fetchVaultData()
+        setVaultData(data)
+      } catch (fetchErr) {
+        console.error('Failed to fetch vault data:', fetchErr)
+      }
+    }
+  }
+
   const protocolStats = vaultData ? getProtocolStats(vaultData) : null
   const totalBorrow = protocolStats?.totalBorrowed || "$0"
   const totalBorrowUSD = "on Flow Testnet"
@@ -65,6 +83,7 @@ export default function LendView({ isWalletConnected, onConnect, userAddress }) 
         isWalletConnected={isWalletConnected}
         onConnect={onConnect}
         userAddress={userAddress}
+        onSupplySuccess={refreshVaultData}
       />
     )
   }
