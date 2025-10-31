@@ -1,4 +1,33 @@
 const VAULT_DATA_PATH = '/vault.json';
+const BACKEND_API = 'http://localhost:3001';
+
+/**
+ * Trigger vault data update on the backend
+ * @returns {Promise<Object>} Updated vault data
+ */
+export async function updateVaultDataFromBackend() {
+  try {
+    console.log('Requesting vault data update from backend...');
+    const response = await fetch(`${BACKEND_API}/api/vault/update`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      console.warn('Backend update failed, will use cached data');
+      return null;
+    }
+    
+    const result = await response.json();
+    console.log('Vault data updated successfully');
+    return result.data;
+  } catch (error) {
+    console.warn('Backend not available, will use cached vault data:', error.message);
+    return null;
+  }
+}
 
 /**
  * Fetch the latest vault data from the JSON file

@@ -19,8 +19,7 @@ export const connectWallet = async () => {
     const user = await fcl.authenticate()
 
     await createWrappedUSDCVault()
-    //await createWrappedETHVault()
-
+    await createWrappedETHVault()
 
     return user
   } catch (error) {

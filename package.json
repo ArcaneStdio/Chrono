@@ -1,9 +1,13 @@
 {
-  "name": "chrono-vault-data-updater",
+  "name": "chrono-protocol",
   "version": "1.0.0",
-  "description": "Automated vault data updater for Chrono Protocol",
+  "description": "Chrono Protocol - Time-based Lending on Flow",
+  "type": "module",
   "main": "update-vault-data.js",
   "scripts": {
+    "backend": "cd chrono-web/backend && npm install && npm start",
+    "backend:dev": "cd chrono-web/backend && npm install && npm run dev",
+    "frontend": "cd chrono-web && npm run dev",
     "update-vault": "node update-vault-data.js && cp vault.json chrono-web/public/vault.json",
     "update-vault-win": "node update-vault-data.js && copy vault.json chrono-web\\public\\vault.json"
   },

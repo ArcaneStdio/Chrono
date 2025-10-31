@@ -18,11 +18,14 @@ export const createLendingPosition = async (amount) => {
         
         let lenderVault: @WrappedETH1.Vault 
         let lendingManagerRef: &TimeLendingProtocol2.LendingManager
+        let signer: Address
+
         
         prepare(signer: auth(BorrowValue, Storage) &Account) {
             // Check the Cadence 1.0 migration guide for the latest syntax updates: https://cadence-lang.org/docs/cadence-migration-guide/improvements
             // Note: The 'auth(BorrowValue, Storage)' is a capability-based authorization that your contract likely requires.
             
+            self.signer = signer.address
             // Borrow reference to signer's ETH vault
             let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &WrappedETH1.Vault>(
                 from: WrappedETH1.VaultStoragePath
@@ -40,7 +43,7 @@ export const createLendingPosition = async (amount) => {
             // Create lending position
             let positionId = self.lendingManagerRef.createLendingPosition(
                 tokenVault: <-self.lenderVault,
-                lender: self.lendingManagerRef.owner!.address
+                lender: self.signer
             )
             
             log("Lending position created with ID: ".concat(positionId.toString()))
