@@ -40,34 +40,22 @@ transaction(positionId: UInt64) {
         log("  Token Type: ".concat(tokenType.identifier))
         log("  Timestamp: ".concat(self.position.timestamp.toString()))
         
-        // Setup recipient based on token type
-        // if tokenType == Type<@WrappedETH1.Vault>() {
-        //     // Receiving ETH back
-        //     self.recipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
-        //         WrappedETH1.ReceiverPublicPath
-        //     ).borrow() ?? panic("Could not borrow WrappedETH receiver capability. Make sure you have WrappedETH1 vault set up.")
-            
-        //     log("  Withdrawing to: WrappedETH vault")
-            
-        // } else if tokenType == Type<@WrappedUSDC1.Vault>() {
-            // Receiving USDC back
+        if tokenType.toString().contains("USDC") {
+            // Get recipient capability for WrappedUSDC1
             self.recipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
                 WrappedUSDC1.ReceiverPublicPath
-            ).borrow() ?? panic("Could not borrow WrappedUSDC receiver capability. Make sure you have WrappedUSDC1 vault set up.")
+            ).borrow() ?? panic("Could not borrow WrappedUSDC receiver capability")
+        } else if tokenType.toString().contains("Flow") {
+            // Get recipient capability for FlowToken
+            self.recipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
+                /public/flowTokenReceiver
+            ).borrow() ?? panic("Could not borrow FLOW receiver capability")
+        } else {
+            self.recipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
+                WrappedETH1.ReceiverPublicPath
+            ).borrow() ?? panic("Could not borrow WrappedETH receiver capability")
+        }
             
-            log("  Withdrawing to: WrappedUSDC vault")
-            
-        // } else if tokenType == Type<@FlowToken.Vault>() {
-        //     // Receiving FLOW back
-        //     self.recipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
-        //         /public/flowTokenReceiver
-        //     ).borrow() ?? panic("Could not borrow FLOW receiver capability")
-            
-        //     log("  Withdrawing to: FLOW vault")
-            
-        // } else {
-        //     panic("Unsupported token type: ".concat(tokenType.identifier))
-        // }
         
         // Calculate time elapsed
         let timeElapsed = getCurrentBlock().timestamp - self.position.timestamp

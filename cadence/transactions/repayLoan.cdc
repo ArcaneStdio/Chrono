@@ -45,21 +45,42 @@ transaction(positionId: UInt64) {
         // Determine which token vault to use for repayment
         let borrowTokenType = self.position.borrowTokenType
         
-        // Withdraw repayment tokens based on borrow token typ
-            // Repaying USDC loan
+        if borrowTokenType.toString().contains("USDC") {
+            // Withdraw USDC from signer's vault for repayment
             let usdcVault = signer.storage.borrow<auth(FungibleToken.Withdraw) &{FungibleToken.Vault}>(
                 from: WrappedUSDC1.VaultStoragePath
-            ) ?? panic("Could not borrow WrappedUSDC vault from storage")
+            ) ?? panic("Could not borrow USDC vault from storage. Make sure you have WrappedUSDC1 vault set up.")
             
             self.repaymentVault <- usdcVault.withdraw(amount: self.totalRepayment)
+        } else if borrowTokenType.toString().contains("WrappedETH1.Vault") {
+            // Withdraw Wrapped ETH from signer's vault for repayment
+            let ethVault = signer.storage.borrow<auth(FungibleToken.Withdraw) &{FungibleToken.Vault}>(
+                from: WrappedETH1.VaultStoragePath
+            ) ?? panic("Could not borrow Wrapped ETH vault from storage. Make sure you have WrappedETH1 vault set up.")
+            
+            self.repaymentVault <- ethVault.withdraw(amount: self.totalRepayment)
+        } else {
+            let flowVault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
+                from: /storage/flowTokenVault
+            ) ?? panic("Could not borrow FLOW vault from storage")
+            self.repaymentVault <- flowVault.withdraw(amount: self.totalRepayment)
+        }
         
         // Setup collateral recipient based on collateral type
         let collateralType = self.position.collateralType
-    
-            // Receiving ETH collateral back
+        if collateralType.toString().contains("ETH") {
             self.collateralRecipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
                 WrappedETH1.ReceiverPublicPath
             ).borrow() ?? panic("Could not borrow WrappedETH receiver capability")
+        } else if collateralType.toString().contains("USDC") {
+            self.collateralRecipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
+                WrappedUSDC1.ReceiverPublicPath
+            ).borrow() ?? panic("Could not borrow WrappedUSDC receiver capability")
+        } else {
+            self.collateralRecipient = signer.capabilities.get<&{FungibleToken.Receiver}>(
+                /public/flowTokenReceiver
+            ).borrow() ?? panic("Could not borrow FLOW receiver capability")
+        }
     }
 
     execute {
