@@ -548,13 +548,15 @@ access(all) contract TimeLendingProtocol2 {
         durationMinutes: UInt64,
         borrower: Address,
         borrowerRecipient: &{FungibleToken.Receiver},  // Recipient for borrowed tokens
-        oraclePayment: @{FungibleToken.Vault}  // Payment for oracle price update
+        oraclePayment1: @{FungibleToken.Vault},
+        oraclePayment2: @{FungibleToken.Vault}
     ): UInt64? 
     {
         // CRITICAL CHECK: Verify lending vault exists and has enough tokens
         if TimeLendingProtocol2.lendingVaults[borrowTokenType] == nil {
             destroy collateralVault
-            destroy oraclePayment
+            destroy oraclePayment1
+            destroy oraclePayment2
             panic("Lending vault does not exist for requested borrow token type")
         }else {
             
@@ -563,7 +565,8 @@ access(all) contract TimeLendingProtocol2 {
             
             if borrowAmount > availableLiquidity {
                 destroy collateralVault
-                destroy oraclePayment
+                destroy oraclePayment1
+                destroy oraclePayment2
                 panic("Insufficient liquidity in lending vault. Available: ".concat(availableLiquidity.toString()).concat(", Requested: ").concat(borrowAmount.toString()))
             }else {
                 
@@ -579,9 +582,12 @@ access(all) contract TimeLendingProtocol2 {
                 
                 // Update collateral price from Oracle (if not a stablecoin)
                 if collateralSymbol != "USDC" && collateralSymbol != "USDT" {
-                    let priceStr = Oracle.getPrice(symbol: collateralSymbol, payment: <- oraclePayment)
+                    let priceStr = Oracle.getPrice(symbol: collateralSymbol, payment: <- oraclePayment1)
                     let collateralPrice = UFix64.fromString(priceStr) ?? 1.0
                     TimeLendingProtocol2.cachedPrices[collateralSymbol] = collateralPrice
+                    let priceStr2 = Oracle.getPrice(symbol: borrowSymbol, payment: <- oraclePayment2)
+                    let borrowPrice = UFix64.fromString(priceStr2) ?? 1.0
+                    TimeLendingProtocol2.cachedPrices[borrowSymbol] = borrowPrice
                     TimeLendingProtocol2.lastPriceUpdate[collateralSymbol] = getCurrentBlock().timestamp
                     
                     emit PriceCacheUpdated(
@@ -591,7 +597,17 @@ access(all) contract TimeLendingProtocol2 {
                     )
                 } else {
                     // Destroy oracle payment if not needed
-                    destroy oraclePayment
+                    let priceStr = Oracle.getPrice(symbol: borrowSymbol, payment: <- oraclePayment1)
+                    let borrowPrice = UFix64.fromString(priceStr) ?? 1.0
+                    TimeLendingProtocol2.cachedPrices[borrowSymbol] = borrowPrice
+                    TimeLendingProtocol2.lastPriceUpdate[borrowSymbol] = getCurrentBlock().timestamp
+                    destroy oraclePayment2
+
+                    emit PriceCacheUpdated(
+                        symbol: borrowSymbol, 
+                        price: borrowPrice, 
+                        timestamp: getCurrentBlock().timestamp
+                    )
                 }
                 
                 // Get current prices
