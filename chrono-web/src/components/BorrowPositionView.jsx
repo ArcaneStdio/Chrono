@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 
-import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
+import { motion } from 'framer-motion'
 
-import { InfoIcon } from './Icons'  
+import { InfoIcon } from './Icons'
+import { useCountUp } from '../hooks/useCountUp'  
 
 import LTVGraph from './LTVGraph'  
 
@@ -34,6 +35,7 @@ export default function BorrowPositionView({
   const [prices, setPrices] = useState({ ETH: 0, WETH: 0, USDC: 1, FLOW: 0 }) // Store prices for all tokens
   const [isBorrowing, setIsBorrowing] = useState(false)
   const [txStatus, setTxStatus] = useState(null)
+  const [startAnimation, setStartAnimation] = useState(false)
 
   const getTokenKeyFromSymbol = (symbol) => {
     const symbolMap = {
@@ -168,6 +170,67 @@ export default function BorrowPositionView({
 
   const maxLTV = calculateMaxLTV(totalMinutes)
   const currentLT = calculateLT(totalMinutes)
+
+  // Capture initial maxLTV for animation (only animate once on mount)
+  const [initialMaxLTV] = useState(() => calculateMaxLTV(0))
+
+  // Trigger animation when component mounts
+  useEffect(() => {
+    setStartAnimation(true)
+  }, [])
+
+  // Format functions for count-up
+  const formatCurrency = (value) => {
+    if (asset?.available && typeof asset.available === 'string' && asset.available.includes('$')) {
+      return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    }
+    return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  const formatMultiplier = (value) => {
+    return `${value.toFixed(2)} x`
+  }
+
+  const formatPercentage = (value) => {
+    return `${value.toFixed(2)} %`
+  }
+
+  // Animated values (1.5x faster: 2000ms / 1.5 = 1333ms)
+  const animatedLiquidity = useCountUp(
+    asset?.available ? asset.available : 0,
+    1333,
+    formatCurrency,
+    startAnimation
+  )
+
+  const animatedMaxMultiplier = useCountUp(
+    16.65,
+    1333,
+    formatMultiplier,
+    startAnimation
+  )
+
+  const animatedMaxROE = useCountUp(
+    initialMaxLTV,
+    1333,
+    formatPercentage,
+    startAnimation
+  )
+
+  // Track when animation should be shown (for 1.333 seconds after mount)
+  const [showAnimatedROE, setShowAnimatedROE] = useState(true)
+  
+  useEffect(() => {
+    if (startAnimation) {
+      const timer = setTimeout(() => {
+        setShowAnimatedROE(false)
+      }, 1333) // Hide animated value after animation completes
+      return () => clearTimeout(timer)
+    }
+  }, [startAnimation])
+
+  // Use animated value during animation period and when totalMinutes is 0, otherwise use current maxLTV
+  const displayMaxROE = showAnimatedROE && totalMinutes === 0 ? animatedMaxROE : formatPercentage(maxLTV)
 
   // Convert collateral value to USD, then to borrow token amount
   const getCollateralValueInBorrowToken = (collateralAmount) => {
@@ -440,16 +503,18 @@ export default function BorrowPositionView({
           <div className="grid grid-cols-3 gap-3 md:gap-8">
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Liquidity</div>
-              <div className="text-base md:text-2xl font-bold text-white">{asset.available}</div>
-              <div className="text-xs text-gray-500 hidden md:block">{asset.availableToken}</div>
+              <div className="text-base md:text-2xl font-bold text-white">
+                {asset?.available ? animatedLiquidity : '—'}
+              </div>
+              <div className="text-xs text-gray-500 hidden md:block">{asset?.availableToken || '—'}</div>
             </div>
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Max multiplier</div>
-              <div className="text-base md:text-2xl font-bold text-white">16.65 x</div>
+              <div className="text-base md:text-2xl font-bold text-white">{animatedMaxMultiplier}</div>
             </div>
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Max ROE</div>
-              <div className="text-base md:text-2xl font-bold text-[#c5ff4a]">{maxLTV.toFixed(2)} %</div>
+              <div className="text-base md:text-2xl font-bold text-[#c5ff4a]">{displayMaxROE}</div>
             </div>
           </div>
         </motion.div>

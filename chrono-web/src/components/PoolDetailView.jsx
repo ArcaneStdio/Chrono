@@ -1,11 +1,73 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion' // eslint-disable-line no-unused-vars
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { addLiquidityUSDC } from '../utils/add-liquidity-usdc'
+import { useCountUp } from '../hooks/useCountUp'
 
 export default function PoolDetailView({ pool, onBack, isWalletConnected, onConnect, userAddress }) {
   const [amount, setAmount] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [txStatus, setTxStatus] = useState(null)
+  const [startAnimation, setStartAnimation] = useState(false)
+
+  // Trigger animation when component mounts
+  useEffect(() => {
+    setStartAnimation(true)
+  }, [])
+
+  // Format functions for count-up
+  const formatNumber = (value) => {
+    // Try to preserve original format if pool data has decimals
+    if (value >= 1000) {
+      return value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    }
+    return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  const formatCurrency = (value) => {
+    return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
+  const formatInteger = (value) => {
+    return Math.floor(value).toLocaleString('en-US')
+  }
+
+  // Extract numeric values
+  const extractNumericValue = (val) => {
+    if (typeof val === 'number') return val
+    if (typeof val === 'string') {
+      // Remove currency symbols, commas, and parse
+      const cleaned = val.replace(/[$,\s]/g, '')
+      const num = parseFloat(cleaned)
+      return isNaN(num) ? 0 : num
+    }
+    return 0
+  }
+
+  const totalShares = extractNumericValue(pool?.totalShares || 0)
+  const usdcLiquidity = extractNumericValue(pool?.totalUSDCLiquidity || 0)
+  const contributors = extractNumericValue(pool?.totalContributors || 0)
+
+  // Animated values (1.5x faster: 1333ms)
+  const animatedTotalShares = useCountUp(
+    totalShares,
+    1333,
+    formatNumber,
+    startAnimation
+  )
+
+  const animatedUSDCLiquidity = useCountUp(
+    usdcLiquidity,
+    1333,
+    formatCurrency,
+    startAnimation
+  )
+
+  const animatedContributors = useCountUp(
+    contributors,
+    1333,
+    formatInteger,
+    startAnimation
+  )
 
   const handleAddLiquidity = async () => {
     const val = parseFloat(amount)
@@ -63,15 +125,21 @@ export default function PoolDetailView({ pool, onBack, isWalletConnected, onConn
           <div className="grid grid-cols-3 gap-3 md:gap-8">
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Total shares</div>
-              <div className="text-lg md:text-3xl font-bold text-white">{pool?.totalShares || '—'}</div>
+              <div className="text-lg md:text-3xl font-bold text-white">
+                {startAnimation && totalShares > 0 ? animatedTotalShares : (pool?.totalShares || '—')}
+              </div>
             </div>
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">USDC liquidity</div>
-              <div className="text-lg md:text-3xl font-bold text-white">{pool?.totalUSDCLiquidity || '—'}</div>
+              <div className="text-lg md:text-3xl font-bold text-white">
+                {startAnimation && usdcLiquidity > 0 ? animatedUSDCLiquidity : (pool?.totalUSDCLiquidity || '—')}
+              </div>
             </div>
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Contributors</div>
-              <div className="text-lg md:text-3xl font-bold text-white">{pool?.totalContributors || '—'}</div>
+              <div className="text-lg md:text-3xl font-bold text-white">
+                {startAnimation && contributors > 0 ? animatedContributors : (pool?.totalContributors || '—')}
+              </div>
             </div>
           </div>
         </motion.div>

@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { repayLoan } from '../utils/repay-loan'
 import { borrowMore } from '../utils/borrow-more'
 import { formatTokenAmount, formatTimestamp } from '../utils/portfolioData'
+import { useCountUp } from '../hooks/useCountUp'
 
 export default function BorrowPositionDetailsView({
   position,
@@ -17,6 +18,7 @@ export default function BorrowPositionDetailsView({
   const [isBorrowingMore, setIsBorrowingMore] = useState(false)
   const [repayTxStatus, setRepayTxStatus] = useState(null)
   const [borrowMoreTxStatus, setBorrowMoreTxStatus] = useState(null)
+  const [startAnimation, setStartAnimation] = useState(false)
 
   const handleRepay = async () => {
     if (!position.isActive) return
@@ -74,6 +76,59 @@ export default function BorrowPositionDetailsView({
         : 'text-red-400'
     : 'text-gray-400'
 
+  // Trigger animation when component mounts
+  useEffect(() => {
+    setStartAnimation(true)
+  }, [])
+
+  // Format functions for count-up
+  const formatNumber = (value) => {
+    return value.toFixed(8)
+  }
+
+  const formatPercentage = (value) => {
+    return `${value.toFixed(2)}%`
+  }
+
+  const formatHealthFactor = (value) => {
+    return value.toFixed(2)
+  }
+
+  // Extract numeric values
+  const collateralAmount = parseFloat(position.collateralAmount) || 0
+  const borrowAmount = parseFloat(position.borrowAmount) || 0
+  const ltvValue = parseFloat(ltvPercent) || 0
+  const healthFactorValue = position.healthFactor ? parseFloat(position.healthFactor) : 0
+
+  // Animated values (1.5x faster: 1333ms)
+  const animatedCollateral = useCountUp(
+    collateralAmount,
+    1333,
+    formatNumber,
+    startAnimation
+  )
+
+  const animatedBorrowed = useCountUp(
+    borrowAmount,
+    1333,
+    formatNumber,
+    startAnimation
+  )
+
+  const animatedLTV = useCountUp(
+    ltvValue,
+    1333,
+    formatPercentage,
+    startAnimation
+  )
+
+  const animatedHealthFactor = useCountUp(
+    healthFactorValue,
+    1333,
+    formatHealthFactor,
+    startAnimation
+  )
+
   return (
     <motion.div
       className="min-h-screen bg-neutral-950 pt-4 md:pt-8"
@@ -117,25 +172,27 @@ export default function BorrowPositionDetailsView({
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Collateral</div>
               <div className="text-lg md:text-3xl font-bold text-white">
-                {formatTokenAmount(position.collateralAmount)}
+                {startAnimation ? animatedCollateral : formatTokenAmount(position.collateralAmount)}
               </div>
               <div className="text-xs text-gray-500">{position.collateralType || '—'}</div>
             </div>
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Borrowed</div>
               <div className="text-lg md:text-3xl font-bold text-white">
-                {formatTokenAmount(position.borrowAmount)}
+                {startAnimation ? animatedBorrowed : formatTokenAmount(position.borrowAmount)}
               </div>
               <div className="text-xs text-gray-500">{position.borrowTokenType || '—'}</div>
             </div>
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">LTV</div>
-              <div className="text-lg md:text-3xl font-bold text-white">{ltvPercent}%</div>
+              <div className="text-lg md:text-3xl font-bold text-white">
+                {startAnimation ? animatedLTV : `${ltvPercent}%`}
+              </div>
             </div>
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Health Factor</div>
               <div className={`text-lg md:text-3xl font-bold ${healthFactorColor}`}>
-                {healthFactor}
+                {startAnimation && healthFactorValue > 0 ? animatedHealthFactor : healthFactor}
               </div>
             </div>
           </div>

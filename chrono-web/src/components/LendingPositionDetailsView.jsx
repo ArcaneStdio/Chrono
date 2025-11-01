@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { withdrawLending } from '../utils/withdraw-lending'
 import { formatTokenAmount, formatTimestamp } from '../utils/portfolioData'
+import { useCountUp } from '../hooks/useCountUp'
 
 export default function LendingPositionDetailsView({
   position,
@@ -13,6 +14,8 @@ export default function LendingPositionDetailsView({
 }) {
   const [isWithdrawing, setIsWithdrawing] = useState(false)
   const [withdrawTxStatus, setWithdrawTxStatus] = useState(null)
+  const [startAnimation, setStartAnimation] = useState(false)
+  const [animationComplete, setAnimationComplete] = useState(false)
 
   const handleWithdraw = async () => {
     if (!position.isActive) return
@@ -35,12 +38,73 @@ export default function LendingPositionDetailsView({
     }
   }
 
-  // Calculate time since position was created
-  const nowSec = Math.floor(Date.now() / 1000)
+  // Calculate time since position was created - capture initial value for animation
   const ts = position.timestamp ? parseFloat(position.timestamp) : 0
+  const [initialTimeActiveHours] = useState(() => {
+    const nowSec = Math.floor(Date.now() / 1000)
+    const timeElapsed = ts > 0 ? nowSec - ts : 0
+    return timeElapsed > 0 ? timeElapsed / 3600 : 0
+  })
+
+  // Calculate current time elapsed for display (updates on re-render)
+  const nowSec = Math.floor(Date.now() / 1000)
   const timeElapsed = ts > 0 ? nowSec - ts : 0
   const daysElapsed = timeElapsed > 0 ? Math.floor(timeElapsed / 86400) : 0
   const hoursElapsed = timeElapsed > 0 ? Math.floor((timeElapsed % 86400) / 3600) : 0
+
+  // Trigger animation when component mounts
+  useEffect(() => {
+    setStartAnimation(true)
+    // Mark animation as complete after duration
+    const timer = setTimeout(() => {
+      setAnimationComplete(true)
+    }, 1333)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Format functions for count-up
+  const formatNumber = (value) => {
+    return value.toFixed(8)
+  }
+
+  const formatTimeActive = (value) => {
+    // value is in hours, convert appropriately
+    if (value < 1) {
+      // If less than 1 hour, show minutes
+      const minutes = Math.floor(value * 60)
+      if (minutes <= 0) {
+        return '0m'
+      }
+      return `${minutes}m`
+    }
+    
+    const days = Math.floor(value / 24)
+    const hours = Math.floor(value % 24)
+    
+    if (days > 0) {
+      return `${days}d ${hours}h`
+    } else {
+      return `${hours}h`
+    }
+  }
+
+  // Extract numeric values
+  const lentAmount = parseFloat(position.amount) || 0
+
+  // Animated values (1.5x faster: 1333ms) - use initial captured value
+  const animatedLentAmount = useCountUp(
+    lentAmount,
+    1333,
+    formatNumber,
+    startAnimation
+  )
+
+  const animatedTimeActive = useCountUp(
+    initialTimeActiveHours,
+    1333,
+    formatTimeActive,
+    startAnimation
+  )
 
   return (
     <motion.div
@@ -85,7 +149,7 @@ export default function LendingPositionDetailsView({
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Lent Amount</div>
               <div className="text-lg md:text-3xl font-bold text-white">
-                {formatTokenAmount(position.amount)}
+                {startAnimation ? animatedLentAmount : formatTokenAmount(position.amount)}
               </div>
               <div className="text-xs text-gray-500">{position.token || '—'}</div>
             </div>
@@ -104,11 +168,20 @@ export default function LendingPositionDetailsView({
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Time Active</div>
               <div className="text-lg md:text-3xl font-bold text-white">
-                {daysElapsed > 0 
-                  ? `${daysElapsed}d ${hoursElapsed}h`
-                  : hoursElapsed > 0
-                    ? `${hoursElapsed}h`
-                    : '—'}
+                {startAnimation && !animationComplete
+                  ? animatedTimeActive
+                  : (() => {
+                      const minutes = timeElapsed > 0 ? Math.floor((timeElapsed % 3600) / 60) : 0
+                      if (daysElapsed > 0) {
+                        return `${daysElapsed}d ${hoursElapsed}h`
+                      } else if (hoursElapsed > 0) {
+                        return `${hoursElapsed}h`
+                      } else if (minutes > 0) {
+                        return `${minutes}m`
+                      } else {
+                        return '0m'
+                      }
+                    })()}
               </div>
             </div>
           </div>
@@ -157,11 +230,18 @@ export default function LendingPositionDetailsView({
                 <div>
                   <div className="text-xs text-gray-500 mb-2">Time Active</div>
                   <div className="text-lg font-semibold text-white">
-                    {daysElapsed > 0 
-                      ? `${daysElapsed}d ${hoursElapsed}h`
-                      : hoursElapsed > 0
-                        ? `${hoursElapsed}h`
-                        : 'Less than 1h'}
+                    {(() => {
+                      const minutes = timeElapsed > 0 ? Math.floor((timeElapsed % 3600) / 60) : 0
+                      if (daysElapsed > 0) {
+                        return `${daysElapsed}d ${hoursElapsed}h`
+                      } else if (hoursElapsed > 0) {
+                        return `${hoursElapsed}h`
+                      } else if (minutes > 0) {
+                        return `${minutes}m`
+                      } else {
+                        return '0m'
+                      }
+                    })()}
                   </div>
                 </div>
               </div>
@@ -194,11 +274,18 @@ export default function LendingPositionDetailsView({
                 <div className="flex justify-between items-center py-3">
                   <span className="text-gray-400">Position Duration</span>
                   <span className="text-white font-semibold">
-                    {daysElapsed > 0 
-                      ? `${daysElapsed} day${daysElapsed !== 1 ? 's' : ''} ${hoursElapsed} hour${hoursElapsed !== 1 ? 's' : ''}`
-                      : hoursElapsed > 0
-                        ? `${hoursElapsed} hour${hoursElapsed !== 1 ? 's' : ''}`
-                        : 'Less than 1 hour'}
+                    {(() => {
+                      const minutes = timeElapsed > 0 ? Math.floor((timeElapsed % 3600) / 60) : 0
+                      if (daysElapsed > 0) {
+                        return `${daysElapsed} day${daysElapsed !== 1 ? 's' : ''} ${hoursElapsed} hour${hoursElapsed !== 1 ? 's' : ''}`
+                      } else if (hoursElapsed > 0) {
+                        return `${hoursElapsed} hour${hoursElapsed !== 1 ? 's' : ''}`
+                      } else if (minutes > 0) {
+                        return `${minutes} minute${minutes !== 1 ? 's' : ''}`
+                      } else {
+                        return '0 minutes'
+                      }
+                    })()}
                   </span>
                 </div>
               </div>

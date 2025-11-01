@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion' // eslint-disable-line no-unused-vars
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import IRMGraph from './IRMGraph'
 import { createLendingPosition } from '../utils/lending-transaction-eth'
+import { useCountUp } from '../hooks/useCountUp'
 
 export default function LendPositionView({
   asset,
@@ -13,11 +14,9 @@ export default function LendPositionView({
 }) {
   const [supplyAmount, setSupplyAmount] = useState('')
   const [isSupplying, setIsSupplying] = useState(false)
-  const [txStatus, setTxStatus] = useState(null) 
-  const utilizationPct = parseFloat((asset.utilization || '').toString()) || 0
-  const radius = 16
-  const circumference = 2 * Math.PI * radius
-
+  const [txStatus, setTxStatus] = useState(null)
+  const [startAnimation, setStartAnimation] = useState(false)
+  
   const vaultData = {
     totalSupply: asset.totalSupply || 'not coming',
     totalSupplyTokens: asset.totalSupplyToken || '—',
@@ -42,6 +41,52 @@ export default function LendPositionView({
     badDebtSocialization: asset.badDebtSocialization || 'not coming',
     interestFee: asset.interestFee || 'not coming'
   }
+
+  const utilizationPct = parseFloat((asset.utilization || '').toString().replace('%', '')) || 0
+  const radius = 16
+  const circumference = 2 * Math.PI * radius
+
+  // Trigger animation when component mounts
+  useEffect(() => {
+    setStartAnimation(true)
+  }, [])
+
+  // Format functions for count-up
+  const formatCurrency = (value) => {
+    if (typeof vaultData.totalSupply === 'string' && vaultData.totalSupply.includes('$')) {
+      return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    }
+    return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  const formatPercentage = (value) => {
+    return `${value.toFixed(2)}%`
+  }
+
+  // Animated values (1.5x faster: 2000ms / 1.5 = 1333ms)
+  const animatedTotalSupply = useCountUp(
+    vaultData.totalSupply !== 'not coming' ? vaultData.totalSupply : 0,
+    1333,
+    formatCurrency,
+    startAnimation
+  )
+
+  const animatedSupplyAPY = useCountUp(
+    vaultData.supplyAPY !== 'not coming' ? vaultData.supplyAPY : 0,
+    1333,
+    formatPercentage,
+    startAnimation
+  )
+
+  const animatedUtilization = useCountUp(
+    utilizationPct,
+    1333,
+    formatPercentage,
+    startAnimation
+  )
+
+  // Animate circular indicator - calculate target dash offset
+  const targetDashOffset = (1 - utilizationPct / 100) * circumference
 
   const handleSupply = async () => {
     const amount = parseFloat(supplyAmount)
@@ -107,12 +152,16 @@ export default function LendPositionView({
           <div className="grid grid-cols-3 gap-3 md:gap-8">
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Total supply</div>
-              <div className="text-lg md:text-3xl font-bold text-white">{vaultData.totalSupply}</div>
+              <div className="text-lg md:text-3xl font-bold text-white">
+                {vaultData.totalSupply !== 'not coming' ? animatedTotalSupply : vaultData.totalSupply}
+              </div>
               <div className="text-xs text-gray-500 hidden md:block">{vaultData.totalSupplyTokens}</div>
             </div>
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Supply APY</div>
-              <div className="text-lg md:text-3xl font-bold text-white">{vaultData.supplyAPY}</div>
+              <div className="text-lg md:text-3xl font-bold text-white">
+                {vaultData.supplyAPY !== 'not coming' ? animatedSupplyAPY : vaultData.supplyAPY}
+              </div>
             </div>
             <div>
               <div className="text-gray-500 text-xs md:text-sm mb-1">Utilization</div>
@@ -127,7 +176,7 @@ export default function LendPositionView({
                       className="stroke-neutral-800"
                       strokeWidth="4"
                     />
-                    <circle
+                    <motion.circle
                       cx="18"
                       cy="18"
                       r={radius}
@@ -136,11 +185,15 @@ export default function LendPositionView({
                       strokeWidth="4"
                       strokeLinecap="round"
                       strokeDasharray={circumference}
-                      strokeDashoffset={(1 - utilizationPct / 100) * circumference}
+                      initial={{ strokeDashoffset: circumference }}
+                      animate={{ strokeDashoffset: targetDashOffset }}
+                      transition={{ duration: 1.333, ease: "easeOut" }}
                     />
                   </svg>
                 </div>
-                <div className="text-lg md:text-3xl font-bold text-white">{vaultData.utilization}</div>
+                <div className="text-lg md:text-3xl font-bold text-white">
+                  {utilizationPct > 0 ? animatedUtilization : vaultData.utilization}
+                </div>
               </div>
             </div>
           </div>

@@ -230,12 +230,12 @@ async function updateVaultData() {
     const outputPath = path.resolve(__dirname, '../public/vault.json');
     fs.writeFileSync(outputPath, JSON.stringify(parsedData, null, 2));
     
-    console.log('✅ Vault data updated successfully!');
-    console.log(`💰 Total Value Locked: $${parsedData.protocolStats.totalValueLocked.toFixed(2)}`);
+    console.log('Vault data updated successfully!');
+    console.log(`Total Value Locked: $${parsedData.protocolStats.totalValueLocked.toFixed(2)}`);
     
     return parsedData;
   } catch (error) {
-    console.error('❌ Failed to update vault data:', error);
+    console.error('Failed to update vault data:', error);
     throw error;
   }
 }

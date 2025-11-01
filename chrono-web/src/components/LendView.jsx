@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'// eslint-disable-line no-unused-vars
+import { motion } from 'framer-motion'
 import { SearchIcon, TrendUpIcon, SortIcon } from './Icons'
 import LendPositionView from './LendPositionView'
-import { fetchVaultData, transformForLendView, getProtocolStats, updateVaultDataFromBackend } from '../utils/vaultData'
+import { fetchVaultData, transformForLendView, getProtocolStats, updateVaultDataFromBackend, formatUSD } from '../utils/vaultData'
+import { useCountUp } from '../hooks/useCountUp'
 
 export default function LendView({ isWalletConnected, onConnect, userAddress }) {
   const [inWallet, setInWallet] = useState(true)
@@ -11,6 +12,12 @@ export default function LendView({ isWalletConnected, onConnect, userAddress }) 
   const [isLoading, setIsLoading] = useState(true)
   const [vaultData, setVaultData] = useState(null)
   const [error, setError] = useState(null)
+  const [startAnimation, setStartAnimation] = useState(false)
+  const [animationComplete, setAnimationComplete] = useState(false)
+  const [initialValues] = useState(() => ({
+    totalBorrow: 0,
+    totalSupply: 0
+  }))
 
   // Fetch vault data on component mount
   useEffect(() => {
@@ -58,6 +65,76 @@ export default function LendView({ isWalletConnected, onConnect, userAddress }) 
   const totalBorrowUSD = "on Flow Testnet"
   const totalSupply = protocolStats?.totalValueLocked || "$0"
   const totalSupplyUSD = "on Flow Testnet"
+  
+  // Extract numeric values from formatted strings (handles K/M/B suffixes)
+  const extractNumericValue = (val) => {
+    if (typeof val === 'number') return val
+    if (typeof val === 'string') {
+      let cleaned = val.replace(/[$,\s]/g, '').toUpperCase()
+      let multiplier = 1
+      
+      if (cleaned.endsWith('B')) {
+        multiplier = 1e9
+        cleaned = cleaned.replace('B', '')
+      } else if (cleaned.endsWith('M')) {
+        multiplier = 1e6
+        cleaned = cleaned.replace('M', '')
+      } else if (cleaned.endsWith('K')) {
+        multiplier = 1e3
+        cleaned = cleaned.replace('K', '')
+      }
+      
+      const num = parseFloat(cleaned)
+      return isNaN(num) ? 0 : num * multiplier
+    }
+    return 0
+  }
+
+  const totalBorrowValue = extractNumericValue(totalBorrow)
+  const totalSupplyValue = extractNumericValue(totalSupply)
+
+  // Capture initial values on first load for animation
+  useEffect(() => {
+    if (!isLoading && vaultData && !startAnimation) {
+      initialValues.totalBorrow = totalBorrowValue
+      initialValues.totalSupply = totalSupplyValue
+      setStartAnimation(true)
+      // Mark animation as complete after duration
+      const timer = setTimeout(() => {
+        setAnimationComplete(true)
+      }, 1333)
+      return () => clearTimeout(timer)
+    }
+  }, [isLoading, vaultData, totalBorrowValue, totalSupplyValue, startAnimation, initialValues])
+
+  // Format function for currency with K/M/B suffixes
+  const formatCurrency = (value) => {
+    return formatUSD(value)
+  }
+
+  // Animated values (1.5x faster: 1333ms) - use initial captured values
+  const animatedTotalBorrow = useCountUp(
+    initialValues.totalBorrow,
+    1333,
+    formatCurrency,
+    startAnimation && !isLoading
+  )
+
+  const animatedTotalSupply = useCountUp(
+    initialValues.totalSupply,
+    1333,
+    formatCurrency,
+    startAnimation && !isLoading
+  )
+
+  // Use animated values during animation, then show current values
+  const displayTotalBorrow = startAnimation && !animationComplete
+    ? animatedTotalBorrow 
+    : totalBorrow
+  const displayTotalSupply = startAnimation && !animationComplete
+    ? animatedTotalSupply
+    : totalSupply
+
   // Transform vault data for display
   const allAssets = vaultData ? transformForLendView(vaultData) : []
 
@@ -145,7 +222,7 @@ export default function LendView({ isWalletConnected, onConnect, userAddress }) 
 
         <div className="flex gap-4 md:gap-8">
           <motion.div
-            className="text-left md:text-right"
+            className="text-left md:text-right min-w-[120px] md:min-w-[140px]"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: 0.1 }}
@@ -154,12 +231,16 @@ export default function LendView({ isWalletConnected, onConnect, userAddress }) 
             {isLoading ? (
               <div className="h-6 md:h-8 w-24 md:w-32 bg-neutral-700 rounded animate-shimmer mb-1"></div>
             ) : (
-              <p className="text-xl md:text-2xl font-semibold text-gray-300"> {totalBorrow}</p>
+              <p className="text-xl md:text-2xl font-semibold text-gray-300 font-mono tabular-nums">
+                <span className="inline-block min-w-[100px] md:min-w-[120px] text-right">
+                  {displayTotalBorrow}
+                </span>
+              </p>
             )}
             <p className="text-xs text-gray-500 hidden md:block">{totalBorrowUSD}</p>
           </motion.div>
           <motion.div
-            className="text-left md:text-right"
+            className="text-left md:text-right min-w-[120px] md:min-w-[140px]"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: 0.2 }}
@@ -168,7 +249,11 @@ export default function LendView({ isWalletConnected, onConnect, userAddress }) 
             {isLoading ? (
               <div className="h-6 md:h-8 w-24 md:w-32 bg-neutral-700 rounded animate-shimmer mb-1"></div>
             ) : (
-              <p className="text-xl md:text-2xl font-semibold text-gray-300"> {totalSupply}</p>
+              <p className="text-xl md:text-2xl font-semibold text-gray-300 font-mono tabular-nums">
+                <span className="inline-block min-w-[100px] md:min-w-[120px] text-right">
+                  {displayTotalSupply}
+                </span>
+              </p>
             )}
             <p className="text-xs text-gray-500 hidden md:block">{totalSupplyUSD}</p>
           </motion.div>
