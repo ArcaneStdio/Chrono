@@ -13,29 +13,31 @@ transaction(usdcAmount: UFix64) {
     
     let usdcVault: @WrappedUSDC1.Vault
     let oraclePayment: @FlowToken.Vault
-    let poolAdmin: &LiquidationPool.PoolAdmin
     let signerAddress: Address
     
     prepare(signer: auth(BorrowValue) &Account) {
         self.signerAddress = signer.address
         
+        // Withdraw USDC from signer's vault
         let usdcVaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &WrappedUSDC1.Vault>(
             from: WrappedUSDC1.VaultStoragePath
         ) ?? panic("Could not borrow USDC vault reference")
         
         self.usdcVault <- usdcVaultRef.withdraw(amount: usdcAmount) as! @WrappedUSDC1.Vault
         
+        // Withdraw Flow for oracle payment
         let flowVaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
             from: /storage/flowTokenVault
         ) ?? panic("Could not borrow Flow vault reference")
         
         self.oraclePayment <- flowVaultRef.withdraw(amount: BandOracle.getFee()) as! @FlowToken.Vault
         
-        self.poolAdmin = LiquidationPool.PoolAdmin()
+    
     }
     
     execute {
-        let sharesMinted = self.poolAdmin.contributeUSDC(
+        // Add USDC liquidity to the pool
+        let sharesMinted = LiquidationPool.contributeUSDC(
             usdcVault: <-self.usdcVault,
             contributor: self.signerAddress,
             oraclePayment: <-self.oraclePayment
